@@ -1,0 +1,212 @@
+// Noosh Jan — database schema
+//
+// Maps to dish-rank-app-spec.md §1 (Core Objects) and §3 (Ranking).
+// Auth itself is handled by Supabase Auth (the `auth.users` table it manages
+// for you) — `User` below is our own `public.users` profile row that
+// mirrors an auth.users row 1:1 via a shared id. See docs/INFRA_SETUP.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled (pgbouncer) connection, used at runtime
+  directUrl = env("DIRECT_URL") // direct connection, used for migrations
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+/// Mirrors a Supabase Auth user. `id` is the same UUID as auth.users.id —
+/// create this row right after sign-up (see docs/INFRA_SETUP.md §Auth).
+model User {
+  id               String   @id @db.Uuid
+  email            String   @unique
+  name             String
+  avatarUrl        String?
+  /// "make my dishes private by default" — forward-only, see spec §5
+  privateByDefault Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  dishesMade              Dish[]               @relation("DishMaker")
+  dishEaten               DishEater[]
+  ratings                 Rating[]
+  wantToTryAdded          WantToTry[]
+  podMemberships          PodMember[]
+  comparisonsAsChallenger PairwiseComparison[] @relation("ComparisonUser")
+
+  @@map("users")
+}
+
+/// Seeded top-level regions + user-created cuisines nested under them.
+/// (spec §1 Cuisine, §4)
+model Cuisine {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  /// null = top-level seeded region; non-null = nests under a region
+  parentId  String?   @db.Uuid
+  parent    Cuisine?  @relation("CuisineHierarchy", fields: [parentId], references: [id])
+  children  Cuisine[] @relation("CuisineHierarchy")
+  isSeeded  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  dishes Dish[]
+
+  @@unique([name, parentId])
+  @@map("cuisines")
+}
+
+/// Freeform, search-or-create tags (spec §1 Dish.tags).
+model Tag {
+  id     String    @id @default(uuid()) @db.Uuid
+  name   String    @unique
+  dishes DishTag[]
+
+  @@map("tags")
+}
+
+/// A group of users sharing a combined ranked view (spec §1 Pod).
+model Pod {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now())
+
+  members     PodMember[]
+  wantToTries WantToTry[]
+
+  @@map("pods")
+}
+
+model PodMember {
+  podId    String   @db.Uuid
+  userId   String   @db.Uuid
+  joinedAt DateTime @default(now())
+  /// distinguishes an accepted member from a pending invite
+  status   String   @default("active") // "active" | "pending"
+
+  pod  Pod  @relation(fields: [podId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([podId, userId])
+  @@map("pod_members")
+}
+
+/// The central object — a dish someone cooked (spec §1 Dish).
+model Dish {
+  id               String     @id @default(uuid()) @db.Uuid
+  name             String
+  photoUrl         String
+  cuisineId        String     @db.Uuid
+  cuisine          Cuisine    @relation(fields: [cuisineId], references: [id])
+  makerId          String     @db.Uuid
+  maker            User       @relation("DishMaker", fields: [makerId], references: [id])
+  notes            String?
+  /// optional "view original" reference — URL or uploaded photo/PDF, never
+  /// transcribed/parsed (spec §4: no AI extraction in v1)
+  recipeUrl        String?
+  recipeAttachment String?
+  visibility       Visibility @default(PUBLIC)
+  cookDate         DateTime?
+  createdAt        DateTime   @default(now())
+
+  eaters         DishEater[]
+  tags           DishTag[]
+  ratings        Rating[]
+  comparisonsAsA PairwiseComparison[] @relation("DishA")
+  comparisonsAsB PairwiseComparison[] @relation("DishB")
+  comparisonsWon PairwiseComparison[] @relation("Winner")
+  convertedFrom  WantToTry?
+
+  @@index([makerId])
+  @@index([cuisineId])
+  @@map("dishes")
+}
+
+/// "Who ate it" — many-to-many, defaults to [maker] in the app layer.
+model DishEater {
+  dishId String @db.Uuid
+  userId String @db.Uuid
+
+  dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([dishId, userId])
+  @@map("dish_eaters")
+}
+
+model DishTag {
+  dishId String @db.Uuid
+  tagId  String @db.Uuid
+
+  dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([dishId, tagId])
+  @@map("dish_tags")
+}
+
+/// A user's personal placement of a dish in their own ranked list
+/// (spec §3 — insertion-sort position + derived display score).
+/// One row per (rater, dish) — NOT per dish overall, since ranking is
+/// personal. "Crowd score" aggregates these across raters for a given dish.
+model Rating {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid // the rater/rank-list owner
+  dishId    String   @db.Uuid
+  /// position within the user's personal ranked list (lower = better),
+  /// used to derive `score`
+  position  Int
+  /// derived display score (e.g. 0-10), recomputed when position changes
+  score     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dishId])
+  @@index([userId, position])
+  @@map("ratings")
+}
+
+/// Log of "which did you like more" answers — powers the insertion-sort
+/// algorithm and lets re-ranks skip already-known comparisons (spec §3).
+model PairwiseComparison {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid // whose personal list this comparison is for
+  dishAId   String   @db.Uuid
+  dishBId   String   @db.Uuid
+  winnerId  String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user   User @relation("ComparisonUser", fields: [userId], references: [id], onDelete: Cascade)
+  dishA  Dish @relation("DishA", fields: [dishAId], references: [id], onDelete: Cascade)
+  dishB  Dish @relation("DishB", fields: [dishBId], references: [id], onDelete: Cascade)
+  winner Dish @relation("Winner", fields: [winnerId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("pairwise_comparisons")
+}
+
+/// Not-yet-cooked ideas; converts into a Dish once logged as made
+/// (spec §1 Want-to-try).
+model WantToTry {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  photoUrl  String?
+  link      String?
+  addedById String   @db.Uuid
+  addedBy   User     @relation(fields: [addedById], references: [id])
+  podId     String?  @db.Uuid
+  pod       Pod?     @relation(fields: [podId], references: [id])
+  createdAt DateTime @default(now())
+
+  /// set once someone logs having cooked it
+  convertedToDishId String? @unique @db.Uuid
+  convertedToDish   Dish?   @relation(fields: [convertedToDishId], references: [id])
+
+  @@map("want_to_trys")
+}
