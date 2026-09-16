@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/current-user";
 import { signOut } from "@/lib/actions/auth";
+import { NavMenu } from "@/components/nav-menu";
 
 export async function SiteHeader() {
   const user = await getCurrentUser();
@@ -12,17 +13,7 @@ export async function SiteHeader() {
       </Link>
 
       {user ? (
-        <nav className="flex items-center gap-4 text-sm">
-          <Link href="/dishes/new" className="font-medium text-sage-600 hover:text-sage-900">
-            Log a dish
-          </Link>
-          <span className="text-ink/60">{user.name}</span>
-          <form action={signOut}>
-            <button type="submit" className="text-ink/60 hover:text-ink">
-              Log out
-            </button>
-          </form>
-        </nav>
+        <NavMenu userName={user.name} signOutAction={signOut} />
       ) : (
         <nav className="flex items-center gap-4 text-sm">
           <Link href="/login" className="text-ink/70 hover:text-ink">

@@ -8,20 +8,33 @@ const initialState: CreateDishState = {};
 export function AddDishForm({
   regions,
   privateByDefault,
+  initialName,
+  initialRecipeUrl,
+  wantToTryId,
+  currentUserName,
+  podMates,
 }: {
   regions: { id: string; name: string }[];
   privateByDefault: boolean;
+  initialName?: string;
+  initialRecipeUrl?: string;
+  wantToTryId?: string;
+  currentUserName: string;
+  podMates: { id: string; name: string }[];
 }) {
   const [state, formAction, pending] = useActionState(createDish, initialState);
 
   return (
     <form action={formAction} className="mt-8 flex flex-col gap-5">
+      {wantToTryId && <input type="hidden" name="wantToTryId" value={wantToTryId} />}
+
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-ink/80">Dish name</span>
         <input
           type="text"
           name="name"
           required
+          defaultValue={initialName}
           placeholder="Ghormeh sabzi"
           className="rounded-lg border border-sage-200 bg-white px-3.5 py-2.5 text-ink outline-none focus:border-sage-600"
         />
@@ -69,6 +82,25 @@ export function AddDishForm({
         </label>
       </div>
 
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="text-sm font-medium text-ink/80">Who ate it</legend>
+        <div className="flex flex-col gap-1.5 text-sm">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="eatSelf" value="on" defaultChecked />
+            {currentUserName} (you)
+          </label>
+          {podMates.map((mate) => (
+            <label key={mate.id} className="flex items-center gap-2">
+              <input type="checkbox" name="eaterIds" value={mate.id} />
+              {mate.name}
+            </label>
+          ))}
+        </div>
+        {podMates.length === 0 && (
+          <span className="text-xs text-ink/50">Join a pod to tag others who ate it.</span>
+        )}
+      </fieldset>
+
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-ink/80">Notes</span>
         <textarea
@@ -95,6 +127,7 @@ export function AddDishForm({
         <input
           type="url"
           name="recipeUrl"
+          defaultValue={initialRecipeUrl}
           placeholder="https:// (optional)"
           className="rounded-lg border border-sage-200 bg-white px-3.5 py-2.5 text-ink outline-none focus:border-sage-600"
         />

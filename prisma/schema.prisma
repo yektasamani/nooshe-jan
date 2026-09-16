@@ -20,6 +20,17 @@ enum Visibility {
   PRIVATE
 }
 
+/// Beli-style broad sentiment, picked before any pairwise comparisons.
+/// Comparisons are then scoped to the same tier — never comparing a loved
+/// dish against a disliked one — and tiers form fixed, contiguous bands in
+/// the personal rank (every LIKED dish outranks every OKAY dish, etc.).
+/// Not in the original spec — added per product decision during build.
+enum RatingTier {
+  LIKED
+  OKAY
+  DISLIKED
+}
+
 /// Mirrors a Supabase Auth user. `id` is the same UUID as auth.users.id —
 /// create this row right after sign-up (see docs/INFRA_SETUP.md §Auth).
 model User {
@@ -156,6 +167,10 @@ model Rating {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @db.Uuid // the rater/rank-list owner
   dishId    String   @db.Uuid
+  /// broad sentiment picked before comparisons started — see RatingTier.
+  /// Defaulted only to ease migrating rows created before this field
+  /// existed; every new rating sets it explicitly.
+  tier      RatingTier @default(OKAY)
   /// position within the user's personal ranked list (lower = better),
   /// used to derive `score`
   position  Int
