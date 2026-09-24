@@ -35,7 +35,7 @@ export function RerankScreen({
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-4 py-12 text-center">
       <h1 className="font-display text-2xl text-sage-900 sm:text-3xl">{prompt}</h1>
-      <p className="mt-2 text-sm text-ink/60">Checking it against what's right next to it.</p>
+      <p className="mt-2 text-sm text-ink/60">Checking it against what&apos;s right next to it.</p>
 
       <form
         action={recordRerankComparison}

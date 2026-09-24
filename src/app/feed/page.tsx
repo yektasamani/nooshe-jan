@@ -12,13 +12,13 @@ export default async function FeedPage() {
   const items = await getFeed(user.id);
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-8">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-8">
       <h1 className="font-display text-2xl text-sage-900">Feed</h1>
 
       {items.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-sage-200 px-6 py-12 text-center">
           <p className="text-ink/70">
-            Nothing here yet — join or create a pod to see what everyone's up to.
+            Nothing here yet. Join or create a pod to see what everyone&apos;s up to.
           </p>
           <Link
             href="/pods"

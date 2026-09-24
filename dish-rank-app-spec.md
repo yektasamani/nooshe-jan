@@ -1,4 +1,4 @@
-# Noosh Jan — Product Spec (v1 / MVP)
+# Nooshe Jan — Product Spec (v1 / MVP)
 
 A web app (mobile-friendly, not native) for families and friends to log dishes
 they cook, rank them against each other (Beli-style pairwise comparison), and
@@ -9,6 +9,7 @@ use combined "pod" views to make faster decisions about what to cook next.
 ## 1. Core Objects
 
 ### Dish (the central object — replaces "recipe")
+
 - `name` (required)
 - `photo` (required)
 - `cuisine` (required) — search-or-create, nests under a seeded top-level
@@ -28,6 +29,7 @@ use combined "pod" views to make faster decisions about what to cook next.
 - `created_at`, `cook_date`
 
 ### Want-to-try
+
 - `name`
 - `photo` or `link` (optional, whichever is available)
 - `added_by`
@@ -37,6 +39,7 @@ use combined "pod" views to make faster decisions about what to cook next.
   name/photo/link as the recipe attachment)
 
 ### User
+
 - `name`, `email`, `password` (standard email/password auth)
 - `avatar/photo`
 - `privacy default` setting — global toggle: "make my dishes private by
@@ -44,6 +47,7 @@ use combined "pod" views to make faster decisions about what to cook next.
   unless explicitly confirmed)
 
 ### Pod
+
 - A group of users (e.g. "Me and Aidan," "Mom, Dad, and brother")
 - Can be created proactively (empty, before any shared cooking history) or
   emerge retroactively from "who ate it" tagging
@@ -55,6 +59,7 @@ use combined "pod" views to make faster decisions about what to cook next.
   start
 
 ### Cuisine (taxonomy)
+
 - Seeded top-level regions (Middle Eastern, East Asian, South Asian,
   European, Latin American, African, North American, Other/Uncategorized,
   etc. — finalize the seed list before building)
@@ -71,11 +76,11 @@ use combined "pod" views to make faster decisions about what to cook next.
    by your own pairwise rank score. Filter chips: maker (me / others),
    cuisine, tags, made vs. want-to-try.
 3. **Profile**
-   - Signature dish / top dishes — computed live from personal rank,
-     filtered to maker = self, no separate stored list
-   - "My dishes, ranked by crowd score" — dishes you made, aggregated across
-     every rating anyone (including you) has given them, regardless of pod
-   - Privacy setting
+    - Signature dish / top dishes — computed live from personal rank,
+      filtered to maker = self, no separate stored list
+    - "My dishes, ranked by crowd score" — dishes you made, aggregated across
+      every rating anyone (including you) has given them, regardless of pod
+    - Privacy setting
 4. **Pod home** — combined ranked list for a pod: avg/consensus score,
    spread/agreement indicator, per-person scores, "made" vs. "want to try"
    tabs, cuisine/tag filters
@@ -101,6 +106,7 @@ comparable across users the way Elo ratings are; insertion-sort needs fewer
 comparisons per new entry and keeps logging fast.
 
 **Flow when a new dish is logged:**
+
 1. Look for existing dishes in the user's personal list with the same
    cuisine. If none, fall back to the parent cuisine (via taxonomy), then to
    cross-cuisine (compare against overall top-rated dish) if still nothing.
@@ -112,6 +118,7 @@ comparisons per new entry and keeps logging fast.
    relative position in the list.
 
 **Re-ranking (re-cooked dish):**
+
 - Default to comparing only against immediate neighbors in the existing
   list (cheap, since it's likely to stay close to its old position).
 - Only trigger a fuller re-comparison if the user flags the result as
@@ -121,6 +128,7 @@ comparisons per new entry and keeps logging fast.
 comparisons — relabeling shouldn't force a re-rank.
 
 **Aggregate / crowd score (profile "my dishes ranked" list):**
+
 - Separate from personal rank. For each dish you made, pull every
   individual score anyone (including you) has given it, and combine
   (average, shown alongside a spread/agreement indicator rather than a
@@ -177,7 +185,7 @@ weighted). Needs to be pinned down during build, not just "position-based."
   forward-only permanently?
 - **Cuisine seed list** — finalize the actual top-level taxonomy before
   building the create-dish flow
-- **Branding** — sage green direction and app name (Noosh Jan) are chosen;
+- **Branding** — sage green direction and app name (Nooshe Jan) are chosen;
   still need full palette (secondary/accent pairing) and logo. See
   DESIGN.md for full brand direction.
 
@@ -188,18 +196,18 @@ weighted). Needs to be pinned down during build, not just "position-based."
 These weren't discussed in depth and need to be picked before/at build
 start:
 
-| Area | Decision needed |
-|---|---|
-| **Frontend framework** | e.g. Next.js / React, or another web framework Claude Code can scaffold cleanly |
-| **Backend** | Same framework's API routes vs. a separate backend service |
-| **Database** | Postgres is a natural fit (relational: users, dishes, pods, ratings, cuisines) |
-| **ORM** | e.g. Prisma / Drizzle if using Postgres + Node |
-| **Auth** | Roll your own email/password vs. an auth provider (e.g. Auth.js/NextAuth, Clerk, Supabase Auth) — a provider will save significant build time for MVP |
-| **Photo storage/hosting** | e.g. S3, Cloudinary, or Supabase Storage — affects cost and upload flow complexity |
-| **Hosting** | e.g. Vercel (pairs well with Next.js), Railway, Render, Fly.io |
-| **Real-time/notifications** | Needed only if notifications are in scope for v1; otherwise skip infra for this entirely |
-| **Environment/secrets management** | How API keys, DB credentials, etc. are stored for local dev vs. production |
-| **Domain/name** | Tied to the branding decision above |
+| Area                               | Decision needed                                                                                                                                       |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Frontend framework**             | e.g. Next.js / React, or another web framework Claude Code can scaffold cleanly                                                                       |
+| **Backend**                        | Same framework's API routes vs. a separate backend service                                                                                            |
+| **Database**                       | Postgres is a natural fit (relational: users, dishes, pods, ratings, cuisines)                                                                        |
+| **ORM**                            | e.g. Prisma / Drizzle if using Postgres + Node                                                                                                        |
+| **Auth**                           | Roll your own email/password vs. an auth provider (e.g. Auth.js/NextAuth, Clerk, Supabase Auth) — a provider will save significant build time for MVP |
+| **Photo storage/hosting**          | e.g. S3, Cloudinary, or Supabase Storage — affects cost and upload flow complexity                                                                    |
+| **Hosting**                        | e.g. Vercel (pairs well with Next.js), Railway, Render, Fly.io                                                                                        |
+| **Real-time/notifications**        | Needed only if notifications are in scope for v1; otherwise skip infra for this entirely                                                              |
+| **Environment/secrets management** | How API keys, DB credentials, etc. are stored for local dev vs. production                                                                            |
+| **Domain/name**                    | Tied to the branding decision above                                                                                                                   |
 
 **Suggested MVP-minimizing stack** (to reduce decisions and move fast):
 Next.js (frontend + API routes) + Postgres + Prisma + an auth provider

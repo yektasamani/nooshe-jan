@@ -165,7 +165,27 @@ policy systems, shown above). No RLS needed on the Prisma-managed tables
 under that model — just make sure no API route naively trusts a
 client-supplied `userId` instead of the session's authenticated user.
 
-## 8. Deploy to Vercel
+## 8. Bug reports (Resend)
+
+`/report-bug` saves every report to the `bug_reports` table regardless of
+what happens next — the email below is best-effort on top of that, never
+required for the report to be captured.
+
+1. https://resend.com → sign up. Use the same email as `BUG_REPORT_EMAIL`
+   below — the default test sender (`onboarding@resend.dev`, which we use;
+   no domain verification needed) can only send **to the account's own
+   email** until you verify a real domain.
+2. **API Keys** → **Create API Key** → copy it (shown once).
+3. In `.env`:
+   ```
+   RESEND_API_KEY="re_..."
+   BUG_REPORT_EMAIL="yektasamani@gmail.com"
+   ```
+4. If `RESEND_API_KEY` is left as the placeholder, `submitBugReport`
+   silently skips sending (checked via a literal `"xxxx"` substring in the
+   key) — reports still save fine, you just won't get emailed.
+
+## 9. Deploy to Vercel
 
 1. Push this repo to GitHub (if not already).
 2. https://vercel.com → **Add New → Project** → import the repo.
@@ -173,7 +193,8 @@ client-supplied `userId` instead of the session's authenticated user.
    add every var from `.env` for **Production** and **Preview**:
    `DATABASE_URL`, `DIRECT_URL`, `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `NEXT_PUBLIC_SUPABASE_DISH_PHOTOS_BUCKET`.
+   `NEXT_PUBLIC_SUPABASE_DISH_PHOTOS_BUCKET`, `RESEND_API_KEY`,
+   `BUG_REPORT_EMAIL`.
 4. Deploy. Vercel runs `npm run build`, which via `postinstall` also runs
    `prisma generate` — but it does **not** run migrations automatically.
    Run `npm run db:migrate:deploy` yourself (locally, pointed at prod) after
@@ -181,7 +202,7 @@ client-supplied `userId` instead of the session's authenticated user.
 5. Once you have a real domain, add it to Supabase's **Auth → URL
    Configuration → Redirect URLs**, and update `Site URL`.
 
-## 9. Local dev loop, day to day
+## 10. Local dev loop, day to day
 
 ```bash
 npm run dev            # start Next.js

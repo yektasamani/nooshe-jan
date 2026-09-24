@@ -1,9 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { resolveEaterIds } from "@/lib/eaters";
+import { resolveCuisineId, resolveTagIds, uploadDishPhoto } from "@/lib/dish-fields";
+import { removeRatingAndRescore } from "@/lib/ranking";
 
 export type CreateDishState = {
   error?: string;
@@ -44,46 +47,16 @@ export async function createDish(
   // sharing a pod with the maker.
   const eaterIds = await resolveEaterIds(authUser.id, myPodIds, eatSelf, submittedEaterIds);
 
-  // Resolve/create the cuisine — search-or-create, always nested under the
-  // chosen top-level region (spec §1/§4). If no specific cuisine name was
-  // typed, the dish is just tagged with the region itself.
-  let cuisineId = regionId;
-  if (cuisineName) {
-    const existing = await prisma.cuisine.findFirst({
-      where: { name: { equals: cuisineName, mode: "insensitive" }, parentId: regionId },
-    });
-    cuisineId = existing
-      ? existing.id
-      : (await prisma.cuisine.create({ data: { name: cuisineName, parentId: regionId } })).id;
-  }
+  const cuisineId = await resolveCuisineId(regionId, cuisineName);
+  const tagIds = await resolveTagIds(tagsRaw);
 
-  // Upload the photo to the dish-photos bucket (docs/INFRA_SETUP.md §6).
-  const bucket = process.env.NEXT_PUBLIC_SUPABASE_DISH_PHOTOS_BUCKET!;
-  const ext = photo.name.split(".").pop() || "jpg";
-  const path = `${authUser.id}/${crypto.randomUUID()}.${ext}`;
-  const { error: uploadError } = await supabase.storage.from(bucket).upload(path, photo);
-  if (uploadError) {
-    return { error: `Photo upload failed: ${uploadError.message}` };
-  }
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(bucket).getPublicUrl(path);
-
-  // Tags — freeform, comma-separated, search-or-create (spec §1).
-  const tagNames = [...new Set(tagsRaw.split(",").map((t) => t.trim()).filter(Boolean))];
-  const tagIds: string[] = [];
-  for (const tagName of tagNames) {
-    const existing = await prisma.tag.findFirst({
-      where: { name: { equals: tagName, mode: "insensitive" } },
-    });
-    const tag = existing ?? (await prisma.tag.create({ data: { name: tagName } }));
-    tagIds.push(tag.id);
-  }
+  const uploaded = await uploadDishPhoto(supabase, authUser.id, photo);
+  if ("error" in uploaded) return { error: uploaded.error };
 
   const dish = await prisma.dish.create({
     data: {
       name,
-      photoUrl: publicUrl,
+      photoUrl: uploaded.url,
       cuisineId,
       makerId: authUser.id,
       notes,
@@ -114,4 +87,115 @@ export async function createDish(
   // the user already has other dishes in that tier — the pairwise
   // comparison flow. See /dishes/[dishId]/rank.
   redirect(`/dishes/${dish.id}/rank`);
+}
+
+/** Editing an already-logged dish (maker only). Unlike createDish, this
+ * never touches ranking — position/tier/score stay exactly as they are.
+ * Photo is optional here (only replaced if a new one's provided); tags
+ * and eaters are fully replaced with whatever's submitted, not merged. */
+export async function updateDish(
+  _prevState: CreateDishState,
+  formData: FormData,
+): Promise<CreateDishState> {
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+  if (!authUser) redirect("/login");
+
+  const dishId = String(formData.get("dishId") ?? "");
+  const existing = await prisma.dish.findUnique({ where: { id: dishId } });
+  if (!existing || existing.makerId !== authUser.id) redirect("/");
+
+  const name = String(formData.get("name") ?? "").trim();
+  const regionId = String(formData.get("regionId") ?? "");
+  const cuisineName = String(formData.get("cuisineName") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+  const recipeUrl = String(formData.get("recipeUrl") ?? "").trim() || null;
+  const tagsRaw = String(formData.get("tags") ?? "").trim();
+  const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
+  const cookDateRaw = String(formData.get("cookDate") ?? "");
+  const eatSelf = formData.get("eatSelf") === "on";
+  const submittedEaterIds = formData.getAll("eaterIds").map(String);
+  const photo = formData.get("photo") as File | null;
+
+  if (!name) return { error: "Give the dish a name." };
+  if (!regionId) return { error: "Pick a cuisine region." };
+
+  const myPodIds = (
+    await prisma.podMember.findMany({ where: { userId: authUser.id, status: "active" }, select: { podId: true } })
+  ).map((m) => m.podId);
+
+  const eaterIds = await resolveEaterIds(authUser.id, myPodIds, eatSelf, submittedEaterIds);
+  const cuisineId = await resolveCuisineId(regionId, cuisineName);
+  const tagIds = await resolveTagIds(tagsRaw);
+
+  let photoUrl = existing.photoUrl;
+  if (photo && photo.size > 0) {
+    const uploaded = await uploadDishPhoto(supabase, authUser.id, photo);
+    if ("error" in uploaded) return { error: uploaded.error };
+    photoUrl = uploaded.url;
+  }
+
+  await prisma.$transaction([
+    prisma.dish.update({
+      where: { id: dishId },
+      data: {
+        name,
+        photoUrl,
+        cuisineId,
+        notes,
+        recipeUrl,
+        visibility,
+        cookDate: cookDateRaw ? new Date(cookDateRaw) : null,
+      },
+    }),
+    prisma.dishEater.deleteMany({ where: { dishId } }),
+    prisma.dishEater.createMany({ data: eaterIds.map((userId) => ({ dishId, userId })) }),
+    prisma.dishTag.deleteMany({ where: { dishId } }),
+    prisma.dishTag.createMany({ data: tagIds.map((tagId) => ({ dishId, tagId })) }),
+  ]);
+
+  revalidatePath(`/dishes/${dishId}`);
+  revalidatePath("/");
+  redirect(`/dishes/${dishId}`);
+}
+
+/** Deleting a dish (maker only). Every rank list that had a Rating on
+ * this dish needs its gap closed and scores recomputed afterward — not
+ * just the maker's own, since a pod-mate could also have rated it. */
+export async function deleteDish(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+  if (!authUser) redirect("/login");
+
+  const dishId = String(formData.get("dishId") ?? "");
+  const dish = await prisma.dish.findUnique({ where: { id: dishId } });
+  if (!dish || dish.makerId !== authUser.id) redirect("/");
+
+  const affectedRatings = await prisma.rating.findMany({
+    where: { dishId },
+    select: { userId: true, position: true },
+  });
+
+  // A dish converted from a want-to-try idea has a NO ACTION (not
+  // cascading) foreign key back to it — null the link first so deleting
+  // the dish doesn't get rejected. The idea itself survives, just
+  // reverts to "not yet converted."
+  await prisma.wantToTry.updateMany({
+    where: { convertedToDishId: dishId },
+    data: { convertedToDishId: null },
+  });
+
+  // Ratings/eaters/tags/comparisons on this dish all cascade-delete with it.
+  await prisma.dish.delete({ where: { id: dishId } });
+
+  for (const rating of affectedRatings) {
+    await removeRatingAndRescore(rating.userId, rating.position);
+  }
+
+  revalidatePath("/");
+  redirect("/");
 }

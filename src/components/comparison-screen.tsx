@@ -37,7 +37,7 @@ export function ComparisonScreen({
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-4 py-12 text-center">
       <h1 className="font-display text-2xl text-sage-900 sm:text-3xl">Which did you like more?</h1>
-      <p className="mt-2 text-sm text-ink/60">A quick call — we'll use it to slot the new dish in.</p>
+      <p className="mt-2 text-sm text-ink/60">A quick call. I&apos;ll use it to slot the new dish in.</p>
 
       <form action={recordComparison} className="mt-10 flex w-full max-w-3xl flex-col items-center gap-6 sm:flex-row sm:justify-center">
         <input type="hidden" name="dishId" value={dishId} />

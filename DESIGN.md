@@ -1,4 +1,4 @@
-# Design Brief — Noosh Jan (نوش جان)
+# Design Brief — Nooshe Jan (نوش جان)
 
 For Claude Code to reference when building any screen/component. This
 should be treated as ground truth for visual direction — check new UI
@@ -40,6 +40,7 @@ Sage should feel like an herb garden and a well-used cutting board, not a
 ## Type
 
 Two typefaces, clearly distinct roles:
+
 - **Display/headline**: a warm, slightly humanist serif or slab serif with
   some personality — used for dish names, screen titles, and the score
   number itself (the score should feel like a stamp or a hand-set number,
@@ -107,7 +108,7 @@ appended arrows on buttons/links — write plain, direct labels instead
 
 ## Name
 
-**Noosh Jan** (نوش جان) — a Persian phrase said to someone before/after a
+**Nooshe Jan** (نوش جان) — a Persian phrase said to someone before/after a
 meal, roughly "enjoy your meal" / "may it nourish you." Warm, personal,
 food-and-people-centered — use this spelling consistently everywhere
 (repo, domain, UI copy, app store listing if applicable). Don't mix with

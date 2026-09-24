@@ -191,3 +191,26 @@ export async function insertRatingAndRescore(
     }
   });
 }
+
+/** The inverse of insertRatingAndRescore — closes the gap left by a
+ * deleted rating (spec: deleting a dish shouldn't leave a hole in the
+ * position sequence or leave everyone else's score stale against a total
+ * that's now wrong) and recomputes remaining scores. Call this *after*
+ * the Rating row itself is gone (e.g. via the Dish's cascade delete),
+ * passing the position it used to occupy. */
+export async function removeRatingAndRescore(userId: string, deletedPosition: number) {
+  await prisma.$transaction(async (tx) => {
+    await tx.rating.updateMany({
+      where: { userId, position: { gt: deletedPosition } },
+      data: { position: { decrement: 1 } },
+    });
+
+    const all = await tx.rating.findMany({ where: { userId }, orderBy: { position: "asc" } });
+    for (const rating of all) {
+      await tx.rating.update({
+        where: { id: rating.id },
+        data: { score: positionToScore(rating.position, all.length) },
+      });
+    }
+  });
+}

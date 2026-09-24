@@ -11,7 +11,7 @@ export default async function WantToTryPage() {
   const items = await getWantToTryItems(user.id);
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-8">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-8">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl text-sage-900">Want to try</h1>
         <Link

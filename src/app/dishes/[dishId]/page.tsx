@@ -38,7 +38,7 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
   const myRating = ratings.find((r) => r.userId === user.id);
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-8">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-8">
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-sage-50">
         <Image
           src={dish.photoUrl}
@@ -54,7 +54,10 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
         <div>
           <h1 className="font-display text-3xl text-sage-900">{dish.name}</h1>
           <p className="mt-1 text-sm text-ink/60">
-            {dish.cuisine.name} · made by {dish.maker.name}
+            {dish.cuisine.name} · made by{" "}
+            <Link href={`/users/${dish.maker.id}`} className="underline hover:text-ink">
+              {dish.maker.name}
+            </Link>
             {dish.visibility === "PRIVATE" && " · Private"}
           </p>
         </div>
@@ -72,7 +75,9 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
                 key={rating.id}
                 className="flex items-center gap-2 rounded-full border border-sage-200 bg-white px-3 py-1.5 text-sm"
               >
-                <span className="text-ink/80">{rating.user.name}</span>
+                <Link href={`/users/${rating.user.id}`} className="text-ink/80 underline hover:text-ink">
+                  {rating.user.name}
+                </Link>
                 <span className="font-display text-sage-600">{rating.score.toFixed(1)}</span>
                 <span className="text-xs text-ink/40">{TIER_LABEL[rating.tier]}</span>
               </li>
@@ -117,14 +122,24 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
         </p>
       )}
 
-      {myRating && (
-        <Link
-          href={`/dishes/${dish.id}/rerank`}
-          className="mt-8 inline-block rounded-full border border-sage-200 px-5 py-2.5 font-medium text-ink hover:border-sage-600"
-        >
-          Re-rank
-        </Link>
-      )}
+      <div className="mt-8 flex gap-2">
+        {myRating && (
+          <Link
+            href={`/dishes/${dish.id}/rerank`}
+            className="inline-block rounded-full border border-sage-200 px-5 py-2.5 font-medium text-ink hover:border-sage-600"
+          >
+            Re-rank
+          </Link>
+        )}
+        {dish.makerId === user.id && (
+          <Link
+            href={`/dishes/${dish.id}/edit`}
+            className="inline-block rounded-full border border-sage-200 px-5 py-2.5 font-medium text-ink hover:border-sage-600"
+          >
+            Edit
+          </Link>
+        )}
+      </div>
     </main>
   );
 }

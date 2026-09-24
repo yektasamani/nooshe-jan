@@ -17,12 +17,18 @@ export default async function NewWantToTryPage() {
     <main className="mx-auto w-full max-w-xl flex-1 px-4 py-10 sm:px-8">
       <h1 className="font-display text-3xl text-sage-900">Add an idea</h1>
       <p className="mt-2 text-sm text-ink/60">
-        Nothing to rank yet — just a place to remember what's next.
+        Nothing to rank yet. Just a place to remember what&apos;s next.
       </p>
 
       <form action={createWantToTry} className="mt-8 flex flex-col gap-5">
+        <p className="text-xs text-ink/50">
+          <span className="text-sage-600">*</span> Required
+        </p>
+
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-ink/80">Name</span>
+          <span className="text-sm font-medium text-ink/80">
+            Name <span className="text-sage-600">*</span>
+          </span>
           <input
             type="text"
             name="name"
@@ -40,7 +46,7 @@ export default async function NewWantToTryPage() {
             accept="image/*"
             className="rounded-lg border border-sage-200 bg-white px-3.5 py-2.5 text-ink file:mr-3 file:rounded-full file:border-0 file:bg-sage-50 file:px-3 file:py-1.5 file:text-sage-900"
           />
-          <span className="text-xs text-ink/50">Optional — whichever you have, photo or link</span>
+          <span className="text-xs text-ink/50">Add a photo or a link if you have one. Both optional.</span>
         </label>
 
         <label className="flex flex-col gap-1.5">

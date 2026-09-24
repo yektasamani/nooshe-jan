@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { AddDishForm } from "@/components/add-dish-form";
+import { createDish } from "@/lib/actions/dishes";
+import { getPodMates } from "@/lib/pod-mates";
 
 export default async function NewDishPage({
   searchParams,
@@ -19,19 +21,7 @@ export default async function NewDishPage({
   // Who's available to tag as an eater (spec §1: "who ate it," defaults to
   // [me], editable) — scoped to people you actually share a pod with,
   // since that's the only "known contacts" concept the app has.
-  const myPodIds = (
-    await prisma.podMember.findMany({ where: { userId: user.id, status: "active" }, select: { podId: true } })
-  ).map((m) => m.podId);
-  const podMates =
-    myPodIds.length > 0
-      ? await prisma.user.findMany({
-          where: {
-            id: { not: user.id },
-            podMemberships: { some: { podId: { in: myPodIds }, status: "active" } },
-          },
-          orderBy: { name: "asc" },
-        })
-      : [];
+  const podMates = await getPodMates(user.id);
 
   // Converting a want-to-try into a real Dish (spec §1): carries over its
   // name and link as a starting point — the actual cooked dish still needs
@@ -56,10 +46,11 @@ export default async function NewDishPage({
       <h1 className="font-display text-3xl text-sage-900">Log a dish</h1>
       <p className="mt-2 text-sm text-ink/70">
         {wantToTry
-          ? `Making "${wantToTry.name}" — nice.`
-          : "Quick and minimal — you can always add more later."}
+          ? `Making "${wantToTry.name}"? Nice.`
+          : "Quick and minimal. You can always add more later."}
       </p>
       <AddDishForm
+        action={createDish}
         regions={regions.map((r) => ({ id: r.id, name: r.name }))}
         privateByDefault={user.privateByDefault}
         initialName={wantToTry?.name}

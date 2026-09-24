@@ -48,6 +48,7 @@ model User {
   wantToTryAdded          WantToTry[]
   podMemberships          PodMember[]
   comparisonsAsChallenger PairwiseComparison[] @relation("ComparisonUser")
+  bugReports              BugReport[]
 
   @@map("users")
 }
@@ -164,9 +165,9 @@ model DishTag {
 /// One row per (rater, dish) — NOT per dish overall, since ranking is
 /// personal. "Crowd score" aggregates these across raters for a given dish.
 model Rating {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid // the rater/rank-list owner
-  dishId    String   @db.Uuid
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @db.Uuid // the rater/rank-list owner
+  dishId    String     @db.Uuid
   /// broad sentiment picked before comparisons started — see RatingTier.
   /// Defaulted only to ease migrating rows created before this field
   /// existed; every new rating sets it explicitly.
@@ -176,8 +177,8 @@ model Rating {
   position  Int
   /// derived display score (e.g. 0-10), recomputed when position changes
   score     Float
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
@@ -224,4 +225,19 @@ model WantToTry {
   convertedToDish   Dish?   @relation(fields: [convertedToDishId], references: [id])
 
   @@map("want_to_trys")
+}
+
+/// A user-submitted bug report — beta-testing feedback channel while the
+/// app is still family-only. Persisted regardless of whether the email
+/// notification succeeds, so nothing gets lost if Resend has a hiccup.
+model BugReport {
+  id         String   @id @default(uuid()) @db.Uuid
+  reporterId String   @db.Uuid
+  reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  message    String
+  /// which page they were on when they hit the issue, if known
+  pageUrl    String?
+  createdAt  DateTime @default(now())
+
+  @@map("bug_reports")
 }
