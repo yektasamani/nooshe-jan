@@ -20,15 +20,20 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
     include: {
       cuisine: true,
       maker: true,
+      coMakers: { include: { user: true } },
       eaters: { include: { user: true } },
       tags: { include: { tag: true } },
     },
   });
   if (!dish) notFound();
 
+  const isMaker = dish.makerId === user.id;
+  const isCoMaker = dish.coMakers.some((c) => c.userId === user.id);
+
   // No pods/sharing yet (spec §5, still open) — for now a private dish is
-  // visible only to its maker; a public one is visible to any signed-in user.
-  if (dish.visibility === "PRIVATE" && dish.makerId !== user.id) notFound();
+  // visible only to whoever made it (primary or co-maker); a public one is
+  // visible to any signed-in user.
+  if (dish.visibility === "PRIVATE" && !isMaker && !isCoMaker) notFound();
 
   const ratings = await prisma.rating.findMany({
     where: { dishId },
@@ -36,6 +41,7 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
     orderBy: { score: "desc" },
   });
   const myRating = ratings.find((r) => r.userId === user.id);
+  const makers = [dish.maker, ...dish.coMakers.map((c) => c.user)];
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-8">
@@ -55,9 +61,14 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
           <h1 className="font-display text-3xl text-sage-900">{dish.name}</h1>
           <p className="mt-1 text-sm text-ink/60">
             {dish.cuisine.name} · made by{" "}
-            <Link href={`/users/${dish.maker.id}`} className="underline hover:text-ink">
-              {dish.maker.name}
-            </Link>
+            {makers.map((maker, i) => (
+              <span key={maker.id}>
+                {i > 0 && (i === makers.length - 1 ? " and " : ", ")}
+                <Link href={`/users/${maker.id}`} className="underline hover:text-ink">
+                  {maker.name}
+                </Link>
+              </span>
+            ))}
             {dish.visibility === "PRIVATE" && " · Private"}
           </p>
         </div>
@@ -123,15 +134,24 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
       )}
 
       <div className="mt-8 flex gap-2">
-        {myRating && (
+        {myRating ? (
           <Link
             href={`/dishes/${dish.id}/rerank`}
             className="inline-block rounded-full border border-sage-200 px-5 py-2.5 font-medium text-ink hover:border-sage-600"
           >
             Re-rank
           </Link>
+        ) : (
+          (isMaker || isCoMaker) && (
+            <Link
+              href={`/dishes/${dish.id}/rank`}
+              className="inline-block rounded-full bg-sage-600 px-5 py-2.5 font-medium text-white hover:bg-sage-900"
+            >
+              Rank this dish
+            </Link>
+          )
         )}
-        {dish.makerId === user.id && (
+        {isMaker && (
           <Link
             href={`/dishes/${dish.id}/edit`}
             className="inline-block rounded-full border border-sage-200 px-5 py-2.5 font-medium text-ink hover:border-sage-600"

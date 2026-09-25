@@ -21,11 +21,13 @@ export function Sidebar({
   userName,
   avatarUrl,
   signOutAction,
+  pendingInviteCount,
 }: {
   userId: string;
   userName: string;
   avatarUrl: string | null;
   signOutAction: () => Promise<void>;
+  pendingInviteCount: number;
 }) {
   const pathname = usePathname();
 
@@ -56,6 +58,11 @@ export function Sidebar({
             >
               <Icon className="h-5 w-5" />
               {label}
+              {href === "/pods" && pendingInviteCount > 0 && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-sage-600 px-1 text-xs font-medium text-white">
+                  {pendingInviteCount}
+                </span>
+              )}
             </Link>
           );
         })}

@@ -3,7 +3,9 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { getWantToTryItems } from "@/lib/want-to-try";
+import { getUnrankedMadeDishes } from "@/lib/unranked-dishes";
 import { deriveFilterOptions, filterRatings, type MakerFilter } from "@/lib/personal-rank";
+import { DishFilterChips, buildFilterHref } from "@/components/filter-chips";
 
 type SearchParams = {
     view?: string;
@@ -11,39 +13,6 @@ type SearchParams = {
     cuisineId?: string;
     tagId?: string;
 };
-
-function buildHref(current: SearchParams, changes: Partial<SearchParams>) {
-    const params = new URLSearchParams();
-    const merged = { ...current, ...changes };
-    for (const [key, value] of Object.entries(merged)) {
-        if (value) params.set(key, value);
-    }
-    const qs = params.toString();
-    return qs ? `/?${qs}` : "/";
-}
-
-function Chip({
-    href,
-    active,
-    children,
-}: {
-    href: string;
-    active: boolean;
-    children: React.ReactNode;
-}) {
-    return (
-        <Link
-            href={href}
-            className={
-                active
-                    ? "rounded-full bg-sage-600 px-3 py-1.5 text-sm font-medium text-white"
-                    : "rounded-full border border-sage-200 px-3 py-1.5 text-sm text-ink/70 hover:border-sage-600"
-            }
-        >
-            {children}
-        </Link>
-    );
-}
 
 export default async function Home({ searchParams }: { searchParams: Promise<SearchParams> }) {
     const user = await getCurrentUser();
@@ -87,13 +56,18 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
 
     // Personal rank (spec §2/§3) — every dish this user has ranked, sorted
     // by their own pairwise position, best first.
-    const allRatings = await prisma.rating.findMany({
-        where: { userId: user.id },
-        include: {
-            dish: { include: { cuisine: true, maker: true, tags: { include: { tag: true } } } },
-        },
-        orderBy: { position: "asc" },
-    });
+    const [allRatings, unrankedMadeDishes] = await Promise.all([
+        prisma.rating.findMany({
+            where: { userId: user.id },
+            include: {
+                dish: {
+                    include: { cuisine: true, maker: true, coMakers: true, tags: { include: { tag: true } } },
+                },
+            },
+            orderBy: { position: "asc" },
+        }),
+        getUnrankedMadeDishes(user.id),
+    ]);
 
     // Filter chips (spec §2.2: maker / cuisine / tags / made vs. want-to-try).
     const { hasOthersMade, cuisineOptions, tagOptions } = deriveFilterOptions(allRatings, user.id);
@@ -109,9 +83,47 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-8">
             <h1 className="font-display text-2xl text-sage-900">Your rank</h1>
 
+            {unrankedMadeDishes.length > 0 && (
+                <div className="mt-4 rounded-xl border border-sage-200 bg-sage-50/60 p-3">
+                    <p className="text-sm font-medium text-sage-900">
+                        {unrankedMadeDishes.length === 1
+                            ? "You made this, but haven't ranked it yet"
+                            : `You made ${unrankedMadeDishes.length} dishes you haven't ranked yet`}
+                    </p>
+                    <ul className="mt-2 flex flex-col gap-2">
+                        {unrankedMadeDishes.map((dish) => (
+                            <li key={dish.id} className="flex items-center gap-3">
+                                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-sage-100">
+                                    <Image
+                                        src={dish.photoUrl}
+                                        alt={dish.name}
+                                        fill
+                                        sizes="40px"
+                                        className="object-cover"
+                                    />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm text-ink">{dish.name}</p>
+                                    <p className="truncate text-xs text-ink/50">
+                                        {dish.cuisine.name}
+                                        {dish.makerId !== user.id && ` · made by ${dish.maker.name}`}
+                                    </p>
+                                </div>
+                                <Link
+                                    href={`/dishes/${dish.id}/rank`}
+                                    className="shrink-0 rounded-full bg-sage-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sage-900"
+                                >
+                                    Rank it
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
             <div className="mt-4 flex gap-2 border-b border-sage-200">
                 <Link
-                    href={buildHref(sp, { view: "made" })}
+                    href={buildFilterHref("/", sp, { view: "made" })}
                     className={
                         view === "made"
                             ? "border-b-2 border-sage-600 px-1 pb-2 text-sm font-medium text-sage-900"
@@ -121,7 +133,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
                     Made
                 </Link>
                 <Link
-                    href={buildHref(sp, { view: "want_to_try" })}
+                    href={buildFilterHref("/", sp, { view: "want_to_try" })}
                     className={
                         view === "want_to_try"
                             ? "border-b-2 border-sage-600 px-1 pb-2 text-sm font-medium text-sage-900"
@@ -179,6 +191,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
                                     >
                                         Log it
                                     </Link>
+                                    {item.addedById === user.id && (
+                                        <Link
+                                            href={`/want-to-try/${item.id}/edit`}
+                                            className="shrink-0 text-sm text-ink/50 hover:text-ink"
+                                        >
+                                            Edit
+                                        </Link>
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -186,70 +206,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
                 </>
             ) : (
                 <>
-                    {(hasOthersMade || cuisineOptions.length > 1 || tagOptions.length > 0) && (
-                        <div className="mt-4 flex flex-col gap-2">
-                            {hasOthersMade && (
-                                <div className="flex flex-wrap gap-1.5">
-                                    <Chip
-                                        href={buildHref(sp, { maker: undefined })}
-                                        active={maker === "all"}
-                                    >
-                                        Everyone
-                                    </Chip>
-                                    <Chip
-                                        href={buildHref(sp, { maker: "me" })}
-                                        active={maker === "me"}
-                                    >
-                                        Me
-                                    </Chip>
-                                    <Chip
-                                        href={buildHref(sp, { maker: "others" })}
-                                        active={maker === "others"}
-                                    >
-                                        Others
-                                    </Chip>
-                                </div>
-                            )}
-                            {cuisineOptions.length > 1 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                    <Chip
-                                        href={buildHref(sp, { cuisineId: undefined })}
-                                        active={!sp.cuisineId}
-                                    >
-                                        All cuisines
-                                    </Chip>
-                                    {cuisineOptions.map((c) => (
-                                        <Chip
-                                            key={c.id}
-                                            href={buildHref(sp, { cuisineId: c.id })}
-                                            active={sp.cuisineId === c.id}
-                                        >
-                                            {c.name}
-                                        </Chip>
-                                    ))}
-                                </div>
-                            )}
-                            {tagOptions.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                    <Chip
-                                        href={buildHref(sp, { tagId: undefined })}
-                                        active={!sp.tagId}
-                                    >
-                                        All tags
-                                    </Chip>
-                                    {tagOptions.map((t) => (
-                                        <Chip
-                                            key={t.id}
-                                            href={buildHref(sp, { tagId: t.id })}
-                                            active={sp.tagId === t.id}
-                                        >
-                                            {t.name}
-                                        </Chip>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <DishFilterChips
+                        basePath="/"
+                        maker={maker}
+                        cuisineId={sp.cuisineId}
+                        tagId={sp.tagId}
+                        hasOthersMade={hasOthersMade}
+                        cuisineOptions={cuisineOptions}
+                        tagOptions={tagOptions}
+                    />
 
                     {allRatings.length === 0 ? (
                         <div className="mt-10 rounded-2xl border border-dashed border-sage-200 px-6 py-16 text-center">

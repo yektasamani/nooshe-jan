@@ -13,7 +13,7 @@ export default async function EditDishPage({ params }: { params: Promise<{ dishI
   const { dishId } = await params;
   const dish = await prisma.dish.findUnique({
     where: { id: dishId },
-    include: { cuisine: true, eaters: true, tags: { include: { tag: true } } },
+    include: { cuisine: true, eaters: true, coMakers: true, tags: { include: { tag: true } } },
   });
   if (!dish || dish.makerId !== user.id) redirect("/");
 
@@ -49,6 +49,7 @@ export default async function EditDishPage({ params }: { params: Promise<{ dishI
         initialVisibility={dish.visibility}
         initialEatSelf={dish.eaters.some((e) => e.userId === user.id)}
         initialSelectedEaterIds={dish.eaters.map((e) => e.userId).filter((id) => id !== user.id)}
+        initialSelectedCoMakerIds={dish.coMakers.map((c) => c.userId)}
         submitLabel="Save changes"
         pendingLabel="Saving…"
       />

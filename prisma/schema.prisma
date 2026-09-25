@@ -43,6 +43,7 @@ model User {
   createdAt        DateTime @default(now())
 
   dishesMade              Dish[]               @relation("DishMaker")
+  dishesCoMade            DishCoMaker[]
   dishEaten               DishEater[]
   ratings                 Rating[]
   wantToTryAdded          WantToTry[]
@@ -125,6 +126,7 @@ model Dish {
   createdAt        DateTime   @default(now())
 
   eaters         DishEater[]
+  coMakers       DishCoMaker[]
   tags           DishTag[]
   ratings        Rating[]
   comparisonsAsA PairwiseComparison[] @relation("DishA")
@@ -147,6 +149,23 @@ model DishEater {
 
   @@id([dishId, userId])
   @@map("dish_eaters")
+}
+
+/// Someone who cooked a dish together with its primary maker — e.g. a
+/// couple cooking together. Not in the original spec; added per product
+/// decision. The primary maker (Dish.makerId) still owns edit/delete; each
+/// co-maker can independently rank the dish in their own personal list,
+/// same as the primary maker does at creation time (spec §3 — ranking is
+/// per-user, so "who made it" and "who's ranked it" are separate things).
+model DishCoMaker {
+  dishId String @db.Uuid
+  userId String @db.Uuid
+
+  dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([dishId, userId])
+  @@map("dish_co_makers")
 }
 
 model DishTag {

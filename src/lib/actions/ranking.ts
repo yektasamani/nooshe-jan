@@ -19,9 +19,14 @@ async function requireUserId() {
 async function loadUnrankedDish(userId: string, dishId: string) {
   const dish = await prisma.dish.findUnique({
     where: { id: dishId },
-    include: { cuisine: true },
+    include: { cuisine: true, coMakers: true },
   });
-  if (!dish || dish.makerId !== userId) redirect("/");
+  if (!dish) redirect("/");
+  // Co-makers can rank a dish they helped cook, same as the primary maker
+  // (spec §3 extension: ranking is per-user, "who made it" and "who's
+  // ranked it" are separate).
+  const canRank = dish.makerId === userId || dish.coMakers.some((c) => c.userId === userId);
+  if (!canRank) redirect("/");
   const existingRating = await prisma.rating.findUnique({ where: { userId_dishId: { userId, dishId } } });
   if (existingRating) redirect("/"); // already ranked, nothing left to do
   return dish;

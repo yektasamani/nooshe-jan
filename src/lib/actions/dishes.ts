@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { resolveEaterIds } from "@/lib/eaters";
+import { resolveCoMakerIds } from "@/lib/co-makers";
 import { resolveCuisineId, resolveTagIds, uploadDishPhoto } from "@/lib/dish-fields";
 import { removeRatingAndRescore } from "@/lib/ranking";
 
@@ -33,6 +34,7 @@ export async function createDish(
   const wantToTryId = String(formData.get("wantToTryId") ?? "").trim() || null;
   const eatSelf = formData.get("eatSelf") === "on";
   const submittedEaterIds = formData.getAll("eaterIds").map(String);
+  const submittedCoMakerIds = formData.getAll("coMakerIds").map(String);
   const photo = formData.get("photo") as File | null;
 
   if (!name) return { error: "Give the dish a name." };
@@ -46,6 +48,10 @@ export async function createDish(
   // "Who ate it" (spec §1) — defaults to [me], editable to include anyone
   // sharing a pod with the maker.
   const eaterIds = await resolveEaterIds(authUser.id, myPodIds, eatSelf, submittedEaterIds);
+  // "Cooked with" — co-makers, e.g. a couple cooking together. Each gets
+  // to independently rank the dish later (dish detail page's "Rank this
+  // dish" CTA), separate from this submitter's own rank happening now.
+  const coMakerIds = await resolveCoMakerIds(authUser.id, myPodIds, submittedCoMakerIds);
 
   const cuisineId = await resolveCuisineId(regionId, cuisineName);
   const tagIds = await resolveTagIds(tagsRaw);
@@ -64,6 +70,7 @@ export async function createDish(
       visibility,
       cookDate: cookDateRaw ? new Date(cookDateRaw) : null,
       eaters: { create: eaterIds.map((userId) => ({ userId })) },
+      coMakers: { create: coMakerIds.map((userId) => ({ userId })) },
       tags: { create: tagIds.map((tagId) => ({ tagId })) },
     },
   });
@@ -117,6 +124,7 @@ export async function updateDish(
   const cookDateRaw = String(formData.get("cookDate") ?? "");
   const eatSelf = formData.get("eatSelf") === "on";
   const submittedEaterIds = formData.getAll("eaterIds").map(String);
+  const submittedCoMakerIds = formData.getAll("coMakerIds").map(String);
   const photo = formData.get("photo") as File | null;
 
   if (!name) return { error: "Give the dish a name." };
@@ -127,6 +135,7 @@ export async function updateDish(
   ).map((m) => m.podId);
 
   const eaterIds = await resolveEaterIds(authUser.id, myPodIds, eatSelf, submittedEaterIds);
+  const coMakerIds = await resolveCoMakerIds(authUser.id, myPodIds, submittedCoMakerIds);
   const cuisineId = await resolveCuisineId(regionId, cuisineName);
   const tagIds = await resolveTagIds(tagsRaw);
 
@@ -152,6 +161,8 @@ export async function updateDish(
     }),
     prisma.dishEater.deleteMany({ where: { dishId } }),
     prisma.dishEater.createMany({ data: eaterIds.map((userId) => ({ dishId, userId })) }),
+    prisma.dishCoMaker.deleteMany({ where: { dishId } }),
+    prisma.dishCoMaker.createMany({ data: coMakerIds.map((userId) => ({ dishId, userId })) }),
     prisma.dishTag.deleteMany({ where: { dishId } }),
     prisma.dishTag.createMany({ data: tagIds.map((tagId) => ({ dishId, tagId })) }),
   ]);

@@ -21,8 +21,13 @@ export default async function RankDishPage({
   if (!user) redirect("/login");
 
   const { dishId } = await params;
-  const dish = await prisma.dish.findUnique({ where: { id: dishId }, include: { cuisine: true } });
-  if (!dish || dish.makerId !== user.id) redirect("/");
+  const dish = await prisma.dish.findUnique({
+    where: { id: dishId },
+    include: { cuisine: true, coMakers: true },
+  });
+  if (!dish) redirect("/");
+  const canRank = dish.makerId === user.id || dish.coMakers.some((c) => c.userId === user.id);
+  if (!canRank) redirect("/");
 
   const alreadyRanked = await prisma.rating.findUnique({
     where: { userId_dishId: { userId: user.id, dishId } },

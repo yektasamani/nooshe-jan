@@ -5,6 +5,7 @@ import { signOut } from "@/lib/actions/auth";
 import { Sidebar } from "@/components/sidebar";
 import { MobileHeader } from "@/components/mobile-header";
 import { BottomNav } from "@/components/bottom-nav";
+import { getPendingInviteCount } from "@/lib/pod-invites";
 
 /** Owns the whole app shell (not just a header) — different wrapping
  * depending on auth state, which is why it takes `children` rather than
@@ -40,13 +41,21 @@ export async function SiteHeader({ children }: { children: ReactNode }) {
         );
     }
 
+    const pendingInviteCount = await getPendingInviteCount(user.id);
+
     return (
         <>
-            <Sidebar userId={user.id} userName={user.name} avatarUrl={user.avatarUrl} signOutAction={signOut} />
+            <Sidebar
+                userId={user.id}
+                userName={user.name}
+                avatarUrl={user.avatarUrl}
+                signOutAction={signOut}
+                pendingInviteCount={pendingInviteCount}
+            />
             <MobileHeader userId={user.id} userName={user.name} avatarUrl={user.avatarUrl} signOutAction={signOut} />
             {/* Bottom padding reserves space for the fixed mobile bottom nav. */}
             <div className="flex flex-1 flex-col pb-16 sm:pb-0">{children}</div>
-            <BottomNav />
+            <BottomNav pendingInviteCount={pendingInviteCount} />
         </>
     );
 }

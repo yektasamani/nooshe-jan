@@ -3,9 +3,10 @@ import { aggregateScores } from "@/lib/ranking";
 
 /**
  * A pod's combined ranked view (spec §1 Pod / §2 "Pod home"): every dish
- * any active member made, that's either public or made by the viewer
- * themself (visibility is per-dish, not implied by pod membership — spec
- * §1: "joining a pod does not auto-expose a member's full history").
+ * any active member made or co-made, that's either public or made/co-made
+ * by the viewer themself (visibility is per-dish, not implied by pod
+ * membership — spec §1: "joining a pod does not auto-expose a member's
+ * full history").
  * Scored by averaging whichever pod members have their own personal
  * Rating for that dish, plus a spread indicator so disagreement stays
  * visible (spec §3: "do not silently hide disagreement").
@@ -22,12 +23,16 @@ export async function getPodCombinedView(podId: string, viewerId: string) {
 
   const dishes = await prisma.dish.findMany({
     where: {
-      makerId: { in: memberIds },
-      OR: [{ visibility: "PUBLIC" }, { makerId: viewerId }],
+      AND: [
+        { OR: [{ makerId: { in: memberIds } }, { coMakers: { some: { userId: { in: memberIds } } } }] },
+        { OR: [{ visibility: "PUBLIC" }, { makerId: viewerId }, { coMakers: { some: { userId: viewerId } } }] },
+      ],
     },
     include: {
       cuisine: true,
       maker: true,
+      coMakers: { include: { user: true } },
+      tags: { include: { tag: true } },
       ratings: { where: { userId: { in: memberIds } }, include: { user: true } },
     },
   });

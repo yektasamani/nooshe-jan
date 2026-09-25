@@ -46,7 +46,7 @@ export default async function NewDishPage({
       <h1 className="font-display text-3xl text-sage-900">Log a dish</h1>
       <p className="mt-2 text-sm text-ink/70">
         {wantToTry
-          ? `Making "${wantToTry.name}"? Nice.`
+          ? `Finally got around to making "${wantToTry.name}"? Let's see if it met expectations.`
           : "Quick and minimal. You can always add more later."}
       </p>
       <AddDishForm

@@ -5,9 +5,17 @@ import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { getSignatureDishes, getCrowdScoredDishes } from "@/lib/profile";
 import { agreementLabel } from "@/lib/ranking";
+import { deriveFilterOptions, filterRatings } from "@/lib/personal-rank";
 import { Avatar } from "@/components/avatar";
+import { DishFilterChips } from "@/components/filter-chips";
 
-export default async function UserProfilePage({ params }: { params: Promise<{ userId: string }> }) {
+export default async function UserProfilePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ userId: string }>;
+  searchParams: Promise<{ cuisineId?: string; tagId?: string }>;
+}) {
   const viewer = await getCurrentUser();
   if (!viewer) redirect("/login");
 
@@ -17,10 +25,21 @@ export default async function UserProfilePage({ params }: { params: Promise<{ us
 
   const isSelf = viewer.id === profileUser.id;
 
-  const [signatureDishes, crowdScored] = await Promise.all([
+  const [signatureDishes, crowdScored, sp] = await Promise.all([
     getSignatureDishes(profileUser.id, viewer.id),
     getCrowdScoredDishes(profileUser.id, viewer.id),
+    searchParams,
   ]);
+
+  // Cuisine/tag filters on the crowd-score list (spec §2.2 — same shared
+  // logic as personal rank and pod combined views). No maker filter here:
+  // every dish on this page was made by the profile owner, always.
+  const { cuisineOptions, tagOptions } = deriveFilterOptions(crowdScored, profileUser.id);
+  const filteredCrowdScored = filterRatings(crowdScored, profileUser.id, {
+    maker: "all",
+    cuisineId: sp.cuisineId,
+    tagId: sp.tagId,
+  });
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-8">
@@ -93,11 +112,23 @@ export default async function UserProfilePage({ params }: { params: Promise<{ us
         <h2 className="text-sm font-medium text-ink/60">
           {isSelf ? "My dishes, ranked by crowd score" : `${profileUser.name}'s dishes, ranked by crowd score`}
         </h2>
+        <DishFilterChips
+          basePath={`/users/${profileUser.id}`}
+          maker="all"
+          cuisineId={sp.cuisineId}
+          tagId={sp.tagId}
+          hasOthersMade={false}
+          cuisineOptions={cuisineOptions}
+          tagOptions={tagOptions}
+        />
+
         {crowdScored.length === 0 ? (
           <p className="mt-3 text-sm text-ink/50">Nothing to see yet.</p>
+        ) : filteredCrowdScored.length === 0 ? (
+          <p className="mt-3 text-sm text-ink/50">Nothing matches these filters.</p>
         ) : (
           <ol className="mt-3 flex flex-col gap-3">
-            {crowdScored.map(({ dish, avg, spread, perPerson }, index) => (
+            {filteredCrowdScored.map(({ dish, avg, spread, perPerson }, index) => (
               <li key={dish.id}>
                 <Link
                   href={`/dishes/${dish.id}`}

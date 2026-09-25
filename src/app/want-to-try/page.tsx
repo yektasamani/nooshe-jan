@@ -53,12 +53,22 @@ export default async function WantToTryPage() {
                   )}
                 </p>
               </div>
-              <Link
-                href={`/dishes/new?wantToTryId=${item.id}`}
-                className="shrink-0 rounded-full border border-sage-200 px-4 py-2 text-sm font-medium text-ink hover:border-sage-600"
-              >
-                Log it
-              </Link>
+              <div className="flex shrink-0 items-center gap-2">
+                {item.addedById === user.id && (
+                  <Link
+                    href={`/want-to-try/${item.id}/edit`}
+                    className="text-sm text-ink/50 hover:text-ink"
+                  >
+                    Edit
+                  </Link>
+                )}
+                <Link
+                  href={`/dishes/new?wantToTryId=${item.id}`}
+                  className="rounded-full border border-sage-200 px-4 py-2 text-sm font-medium text-ink hover:border-sage-600"
+                >
+                  Log it
+                </Link>
+              </div>
             </li>
           ))}
         </ul>

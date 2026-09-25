@@ -17,7 +17,7 @@ const RIGHT_LINKS = [
  * center since it's the core-loop action (spec: "fast beats thorough").
  * Account (profile/settings/log out) lives in the header's avatar menu
  * instead of down here — this bar is purely "navigate the app." */
-export function BottomNav() {
+export function BottomNav({ pendingInviteCount }: { pendingInviteCount: number }) {
   const pathname = usePathname();
 
   const tab = (href: string, label: string, Icon: typeof FeedIcon) => {
@@ -27,11 +27,18 @@ export function BottomNav() {
         key={href}
         href={href}
         aria-label={label}
-        className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] ${
+        className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] ${
           active ? "text-sage-900" : "text-ink/50"
         }`}
       >
-        <Icon className="h-5 w-5" />
+        <span className="relative">
+          <Icon className="h-5 w-5" />
+          {href === "/pods" && pendingInviteCount > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-sage-600 text-[8px] text-white">
+              {pendingInviteCount}
+            </span>
+          )}
+        </span>
         {label}
       </Link>
     );

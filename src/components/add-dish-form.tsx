@@ -24,6 +24,7 @@ export function AddDishForm({
   initialVisibility,
   initialEatSelf = true,
   initialSelectedEaterIds = [],
+  initialSelectedCoMakerIds = [],
   submitLabel = "Log a dish",
   pendingLabel = "Saving…",
 }: {
@@ -47,6 +48,7 @@ export function AddDishForm({
   initialVisibility?: "PUBLIC" | "PRIVATE";
   initialEatSelf?: boolean;
   initialSelectedEaterIds?: string[];
+  initialSelectedCoMakerIds?: string[];
   submitLabel?: string;
   pendingLabel?: string;
 }) {
@@ -156,6 +158,28 @@ export function AddDishForm({
           <span className="text-xs text-ink/50">Join a pod to tag others who ate it.</span>
         )}
       </fieldset>
+
+      {podMates.length > 0 && (
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="text-sm font-medium text-ink/80">Cooked with</legend>
+          <div className="flex flex-col gap-1.5 text-sm">
+            {podMates.map((mate) => (
+              <label key={mate.id} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="coMakerIds"
+                  value={mate.id}
+                  defaultChecked={initialSelectedCoMakerIds.includes(mate.id)}
+                />
+                {mate.name}
+              </label>
+            ))}
+          </div>
+          <span className="text-xs text-ink/50">
+            If someone helped make this, they can rank it in their own list too.
+          </span>
+        </fieldset>
+      )}
 
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-ink/80">Notes</span>

@@ -15,7 +15,10 @@ export async function getSignatureDishes(profileUserId: string, viewerId: string
   return prisma.rating.findMany({
     where: {
       userId: profileUserId,
-      dish: { makerId: profileUserId, ...(isSelf ? {} : { visibility: "PUBLIC" }) },
+      dish: {
+        OR: [{ makerId: profileUserId }, { coMakers: { some: { userId: profileUserId } } }],
+        ...(isSelf ? {} : { visibility: "PUBLIC" }),
+      },
     },
     include: { dish: { include: { cuisine: true } } },
     orderBy: { position: "asc" },
@@ -32,8 +35,16 @@ export async function getSignatureDishes(profileUserId: string, viewerId: string
 export async function getCrowdScoredDishes(profileUserId: string, viewerId: string) {
   const isSelf = viewerId === profileUserId;
   const dishes = await prisma.dish.findMany({
-    where: { makerId: profileUserId, ...(isSelf ? {} : { visibility: "PUBLIC" }) },
-    include: { cuisine: true, ratings: { include: { user: true } } },
+    where: {
+      OR: [{ makerId: profileUserId }, { coMakers: { some: { userId: profileUserId } } }],
+      ...(isSelf ? {} : { visibility: "PUBLIC" }),
+    },
+    include: {
+      cuisine: true,
+      coMakers: { include: { user: true } },
+      tags: { include: { tag: true } },
+      ratings: { include: { user: true } },
+    },
   });
 
   const withAggregates = dishes.map((dish) => {
