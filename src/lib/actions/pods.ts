@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { uploadImage } from "@/lib/dish-fields";
 
 async function requireUserId() {
   const supabase = await createClient();
@@ -116,6 +117,32 @@ export async function leavePod(formData: FormData): Promise<void> {
 
   revalidatePath("/pods");
   redirect("/pods");
+}
+
+/** Setting/changing a pod's cover photo — any active member, same
+ * symmetric-permission philosophy as the rest of pod management (no
+ * owner concept). */
+export async function updatePodPhoto(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const userId = await requireUserId();
+  const podId = String(formData.get("podId"));
+
+  const membership = await prisma.podMember.findUnique({
+    where: { podId_userId: { podId, userId }, status: "active" },
+  });
+  if (!membership) redirect("/pods");
+
+  const photo = formData.get("photo") as File | null;
+  if (photo && photo.size > 0) {
+    const uploaded = await uploadImage(supabase, userId, photo);
+    if (!("error" in uploaded)) {
+      await prisma.pod.update({ where: { id: podId }, data: { coverPhotoUrl: uploaded.url } });
+    }
+  }
+
+  revalidatePath(`/pods/${podId}`);
+  revalidatePath("/pods");
+  redirect(`/pods/${podId}`);
 }
 
 /** Removing someone else from a pod. Symmetric on purpose — pods have no

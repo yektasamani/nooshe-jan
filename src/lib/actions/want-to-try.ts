@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
-import { uploadDishPhoto } from "@/lib/dish-fields";
+import { uploadImage } from "@/lib/dish-fields";
 
 /** Log an idea before it's ever been cooked (spec §1 Want-to-try) — no
  * ranking involved, nothing to rank until it's actually made. */
@@ -33,7 +33,7 @@ export async function createWantToTry(formData: FormData): Promise<void> {
 
   let photoUrl: string | null = null;
   if (photo && photo.size > 0) {
-    const uploaded = await uploadDishPhoto(supabase, authUser.id, photo);
+    const uploaded = await uploadImage(supabase, authUser.id, photo);
     if (!("error" in uploaded)) photoUrl = uploaded.url;
   }
 
@@ -74,7 +74,7 @@ export async function updateWantToTry(formData: FormData): Promise<void> {
 
   let photoUrl = existing.photoUrl;
   if (photo && photo.size > 0) {
-    const uploaded = await uploadDishPhoto(supabase, authUser.id, photo);
+    const uploaded = await uploadImage(supabase, authUser.id, photo);
     if (!("error" in uploaded)) photoUrl = uploaded.url;
   }
 

@@ -7,13 +7,15 @@ import { prisma } from "@/lib/prisma";
 import { getPodCombinedView } from "@/lib/pods";
 import { agreementLabel } from "@/lib/ranking";
 import { searchUsersByName } from "@/lib/users";
-import { invitePodMember, leavePod, removePodMember } from "@/lib/actions/pods";
+import { invitePodMember, leavePod, removePodMember, updatePodPhoto } from "@/lib/actions/pods";
 import { deriveFilterOptions, filterRatings, type MakerFilter } from "@/lib/personal-rank";
 import { deriveAddedByOptions, filterByAddedBy } from "@/lib/want-to-try-filters";
 import { CopyInviteLink } from "@/components/copy-invite-link";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { DishFilterChips, Chip, buildFilterHref } from "@/components/filter-chips";
+import { Avatar } from "@/components/avatar";
+import { PodPhotoForm } from "@/components/pod-photo-form";
 
 export default async function PodPage({
   params,
@@ -78,9 +80,17 @@ export default async function PodPage({
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-8">
-      <h1 className="font-display text-2xl text-sage-900">{pod.name}</h1>
+      <div className="flex items-center gap-4">
+        <Avatar name={pod.name} avatarUrl={pod.coverPhotoUrl} size="lg" />
+        <div>
+          <h1 className="font-display text-2xl text-sage-900">{pod.name}</h1>
+          <div className="mt-2">
+            <PodPhotoForm podId={pod.id} action={updatePodPhoto} />
+          </div>
+        </div>
+      </div>
 
-      <ul className="mt-2 flex flex-wrap gap-1.5">
+      <ul className="mt-4 flex flex-wrap gap-1.5">
         {pod.members.map((member) => (
           <li
             key={member.userId}
@@ -117,59 +127,64 @@ export default async function PodPage({
         ))}
       </ul>
 
-      <div className="mt-4 rounded-xl border border-sage-200/70 bg-white p-4">
-        <p className="text-sm font-medium text-ink/80">Invite someone</p>
-        <CopyInviteLink url={inviteUrl} />
+      <details className="group mt-3" open={Boolean(inviteQuery)}>
+        <summary className="inline-flex w-fit cursor-pointer list-none items-center gap-1 rounded-full border border-dashed border-sage-300 px-3 py-1.5 text-sm font-medium text-sage-700 hover:border-sage-600 hover:text-sage-900 [&::-webkit-details-marker]:hidden">
+          <span aria-hidden>+</span> Invite someone
+        </summary>
 
-        <form method="GET" className="mt-4 flex gap-2">
-          <input
-            type="text"
-            name="inviteQuery"
-            defaultValue={inviteQuery ?? ""}
-            placeholder="Or search by name"
-            className="flex-1 rounded-lg border border-sage-200 bg-cream px-3 py-2 text-sm text-ink outline-none focus:border-sage-600"
-          />
-          <button
-            type="submit"
-            className="rounded-full border border-sage-200 px-4 py-2 text-sm font-medium text-ink hover:border-sage-600"
-          >
-            Search
-          </button>
-        </form>
+        <div className="mt-3 rounded-xl border border-sage-200/70 bg-white p-4">
+          <CopyInviteLink url={inviteUrl} />
 
-        {inviteQuery && (
-          <ul className="mt-2 flex flex-col gap-1.5">
-            {inviteResults.length === 0 ? (
-              <p className="text-sm text-ink/50">No one found matching &quot;{inviteQuery}&quot;.</p>
-            ) : (
-              inviteResults.map((result) => (
-                <li
-                  key={result.id}
-                  className="flex items-center justify-between rounded-lg bg-cream px-3 py-2"
-                >
-                  <span className="text-sm text-ink">{result.name}</span>
-                  <form action={invitePodMember}>
-                    <input type="hidden" name="podId" value={podId} />
-                    <input type="hidden" name="targetUserId" value={result.id} />
-                    <SubmitButton
-                      pendingText="…"
-                      className="rounded-full bg-sage-600 px-3 py-1 text-xs font-medium text-white hover:bg-sage-900 disabled:opacity-60"
-                    >
-                      Invite
-                    </SubmitButton>
-                  </form>
-                </li>
-              ))
-            )}
-          </ul>
-        )}
+          <form method="GET" className="mt-4 flex gap-2">
+            <input
+              type="text"
+              name="inviteQuery"
+              defaultValue={inviteQuery ?? ""}
+              placeholder="Find a person to invite"
+              className="flex-1 rounded-lg border border-sage-200 bg-cream px-3 py-2 text-sm text-ink outline-none focus:border-sage-600"
+            />
+            <button
+              type="submit"
+              className="rounded-full border border-sage-200 px-4 py-2 text-sm font-medium text-ink hover:border-sage-600"
+            >
+              Search
+            </button>
+          </form>
 
-        {pendingInvites.length > 0 && (
-          <p className="mt-3 text-xs text-ink/50">
-            Invited, waiting to accept: {pendingInvites.map((i) => i.user.name).join(", ")}
-          </p>
-        )}
-      </div>
+          {inviteQuery && (
+            <ul className="mt-2 flex flex-col gap-1.5">
+              {inviteResults.length === 0 ? (
+                <p className="text-sm text-ink/50">No one found matching &quot;{inviteQuery}&quot;.</p>
+              ) : (
+                inviteResults.map((result) => (
+                  <li
+                    key={result.id}
+                    className="flex items-center justify-between rounded-lg bg-cream px-3 py-2"
+                  >
+                    <span className="text-sm text-ink">{result.name}</span>
+                    <form action={invitePodMember}>
+                      <input type="hidden" name="podId" value={podId} />
+                      <input type="hidden" name="targetUserId" value={result.id} />
+                      <SubmitButton
+                        pendingText="…"
+                        className="rounded-full bg-sage-600 px-3 py-1 text-xs font-medium text-white hover:bg-sage-900 disabled:opacity-60"
+                      >
+                        Invite
+                      </SubmitButton>
+                    </form>
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
+
+          {pendingInvites.length > 0 && (
+            <p className="mt-3 text-xs text-ink/50">
+              Invited, waiting to accept: {pendingInvites.map((i) => i.user.name).join(", ")}
+            </p>
+          )}
+        </div>
+      </details>
 
       <div className="mt-8 flex gap-2 border-b border-sage-200">
         <Link

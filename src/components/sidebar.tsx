@@ -9,7 +9,7 @@ const LINKS = [
   { href: "/feed", label: "Feed", Icon: FeedIcon },
   { href: "/pods", label: "Pods", Icon: PodsIcon },
   { href: "/want-to-try", label: "Want to try", Icon: WantToTryIcon },
-  { href: "/search", label: "Search", Icon: SearchIcon },
+  { href: "/search", label: "Find people", Icon: SearchIcon },
 ];
 
 /** Persistent left nav on wider screens — an actual app shell (fills

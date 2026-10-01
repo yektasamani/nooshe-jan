@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { resolveEaterIds } from "@/lib/eaters";
 import { resolveCoMakerIds } from "@/lib/co-makers";
-import { resolveCuisineId, resolveTagIds, uploadDishPhoto } from "@/lib/dish-fields";
+import { resolveCuisineId, resolveTagIds, uploadImage, collectNewPhotos } from "@/lib/dish-fields";
 import { removeRatingAndRescore } from "@/lib/ranking";
 
 export type CreateDishState = {
@@ -35,11 +35,11 @@ export async function createDish(
   const eatSelf = formData.get("eatSelf") === "on";
   const submittedEaterIds = formData.getAll("eaterIds").map(String);
   const submittedCoMakerIds = formData.getAll("coMakerIds").map(String);
-  const photo = formData.get("photo") as File | null;
+  const newPhotos = collectNewPhotos(formData);
 
   if (!name) return { error: "Give the dish a name." };
   if (!regionId) return { error: "Pick a cuisine region." };
-  if (!photo || photo.size === 0) return { error: "Add a photo." };
+  if (newPhotos.length === 0) return { error: "Add a photo." };
 
   const myPodIds = (
     await prisma.podMember.findMany({ where: { userId: authUser.id, status: "active" }, select: { podId: true } })
@@ -56,13 +56,19 @@ export async function createDish(
   const cuisineId = await resolveCuisineId(regionId, cuisineName);
   const tagIds = await resolveTagIds(tagsRaw);
 
-  const uploaded = await uploadDishPhoto(supabase, authUser.id, photo);
-  if ("error" in uploaded) return { error: uploaded.error };
+  const uploadedPhotos: { url: string; shape: "SQUARE" | "ORIGINAL" }[] = [];
+  for (const { file, shape } of newPhotos) {
+    const uploaded = await uploadImage(supabase, authUser.id, file);
+    if ("error" in uploaded) return { error: uploaded.error };
+    uploadedPhotos.push({ url: uploaded.url, shape });
+  }
 
   const dish = await prisma.dish.create({
     data: {
       name,
-      photoUrl: uploaded.url,
+      // First photo mirrors as the "cover" everywhere a single thumbnail
+      // is shown; the full gallery lives on DishPhoto.
+      photoUrl: uploadedPhotos[0].url,
       cuisineId,
       makerId: authUser.id,
       notes,
@@ -72,6 +78,9 @@ export async function createDish(
       eaters: { create: eaterIds.map((userId) => ({ userId })) },
       coMakers: { create: coMakerIds.map((userId) => ({ userId })) },
       tags: { create: tagIds.map((tagId) => ({ tagId })) },
+      photos: {
+        create: uploadedPhotos.map((p, i) => ({ url: p.url, displayShape: p.shape, position: i })),
+      },
     },
   });
 
@@ -111,7 +120,7 @@ export async function updateDish(
   if (!authUser) redirect("/login");
 
   const dishId = String(formData.get("dishId") ?? "");
-  const existing = await prisma.dish.findUnique({ where: { id: dishId } });
+  const existing = await prisma.dish.findUnique({ where: { id: dishId }, include: { photos: true } });
   if (!existing || existing.makerId !== authUser.id) redirect("/");
 
   const name = String(formData.get("name") ?? "").trim();
@@ -125,10 +134,18 @@ export async function updateDish(
   const eatSelf = formData.get("eatSelf") === "on";
   const submittedEaterIds = formData.getAll("eaterIds").map(String);
   const submittedCoMakerIds = formData.getAll("coMakerIds").map(String);
-  const photo = formData.get("photo") as File | null;
+  const removePhotoIds = new Set(formData.getAll("removePhotoIds").map(String));
+  const newPhotos = collectNewPhotos(formData);
 
   if (!name) return { error: "Give the dish a name." };
   if (!regionId) return { error: "Pick a cuisine region." };
+
+  const survivingExisting = existing.photos
+    .filter((p) => !removePhotoIds.has(p.id))
+    .sort((a, b) => a.position - b.position);
+  if (survivingExisting.length + newPhotos.length === 0) {
+    return { error: "Keep at least one photo." };
+  }
 
   const myPodIds = (
     await prisma.podMember.findMany({ where: { userId: authUser.id, status: "active" }, select: { podId: true } })
@@ -139,12 +156,14 @@ export async function updateDish(
   const cuisineId = await resolveCuisineId(regionId, cuisineName);
   const tagIds = await resolveTagIds(tagsRaw);
 
-  let photoUrl = existing.photoUrl;
-  if (photo && photo.size > 0) {
-    const uploaded = await uploadDishPhoto(supabase, authUser.id, photo);
+  const uploadedNewPhotos: { url: string; shape: "SQUARE" | "ORIGINAL" }[] = [];
+  for (const { file, shape } of newPhotos) {
+    const uploaded = await uploadImage(supabase, authUser.id, file);
     if ("error" in uploaded) return { error: uploaded.error };
-    photoUrl = uploaded.url;
+    uploadedNewPhotos.push({ url: uploaded.url, shape });
   }
+
+  const photoUrl = survivingExisting[0]?.url ?? uploadedNewPhotos[0].url;
 
   await prisma.$transaction([
     prisma.dish.update({
@@ -159,6 +178,19 @@ export async function updateDish(
         cookDate: cookDateRaw ? new Date(cookDateRaw) : null,
       },
     }),
+    ...(removePhotoIds.size > 0
+      ? [prisma.dishPhoto.deleteMany({ where: { id: { in: [...removePhotoIds] } } })]
+      : []),
+    ...survivingExisting.map((p, i) => {
+      const shapeField = formData.get(`photoShape_${p.id}`);
+      const shape = shapeField === "ORIGINAL" ? "ORIGINAL" : "SQUARE";
+      return prisma.dishPhoto.update({ where: { id: p.id }, data: { position: i, displayShape: shape } });
+    }),
+    ...uploadedNewPhotos.map((p, i) =>
+      prisma.dishPhoto.create({
+        data: { dishId, url: p.url, displayShape: p.shape, position: survivingExisting.length + i },
+      }),
+    ),
     prisma.dishEater.deleteMany({ where: { dishId } }),
     prisma.dishEater.createMany({ data: eaterIds.map((userId) => ({ dishId, userId })) }),
     prisma.dishCoMaker.deleteMany({ where: { dishId } }),

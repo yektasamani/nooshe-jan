@@ -13,6 +13,14 @@ import { prisma } from "@/lib/prisma";
  * re-rank can produce several of them. Left out rather than guessed at;
  * would need a dedicated event log to do properly.
  */
+export type FeedComment = {
+  id: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  createdAt: Date;
+};
+
 export type FeedItem =
   | {
       type: "dish";
@@ -22,10 +30,13 @@ export type FeedItem =
       dishName: string;
       photoUrl: string;
       cuisineName: string;
+      makerId: string;
       makerName: string;
       /** The maker's own score for it, if they've finished ranking it —
        * null right after logging, before the tier/comparison flow. */
       score: number | null;
+      likedByUserIds: string[];
+      comments: FeedComment[];
     }
   | {
       type: "want_to_try";
@@ -33,8 +44,11 @@ export type FeedItem =
       createdAt: Date;
       wantToTryId: string;
       name: string;
+      addedById: string;
       addedByName: string;
       podName: string;
+      likedByUserIds: string[];
+      comments: FeedComment[];
     };
 
 export async function getFeed(userId: string, take = 30): Promise<FeedItem[]> {
@@ -58,13 +72,24 @@ export async function getFeed(userId: string, take = 30): Promise<FeedItem[]> {
   const [dishes, wantToTrys] = await Promise.all([
     prisma.dish.findMany({
       where: { makerId: { in: memberIds }, OR: [{ visibility: "PUBLIC" }, { makerId: userId }] },
-      include: { maker: true, cuisine: true, ratings: true },
+      include: {
+        maker: true,
+        cuisine: true,
+        ratings: true,
+        likes: true,
+        comments: { include: { user: true }, orderBy: { createdAt: "asc" } },
+      },
       orderBy: { createdAt: "desc" },
       take,
     }),
     prisma.wantToTry.findMany({
       where: { podId: { in: myPodIds } },
-      include: { addedBy: true, pod: true },
+      include: {
+        addedBy: true,
+        pod: true,
+        likes: true,
+        comments: { include: { user: true }, orderBy: { createdAt: "asc" } },
+      },
       orderBy: { createdAt: "desc" },
       take,
     }),
@@ -79,8 +104,17 @@ export async function getFeed(userId: string, take = 30): Promise<FeedItem[]> {
       dishName: d.name,
       photoUrl: d.photoUrl,
       cuisineName: d.cuisine.name,
+      makerId: d.makerId,
       makerName: d.maker.name,
       score: d.ratings.find((r) => r.userId === d.makerId)?.score ?? null,
+      likedByUserIds: d.likes.map((l) => l.userId),
+      comments: d.comments.map((c) => ({
+        id: c.id,
+        authorId: c.userId,
+        authorName: c.user.name,
+        body: c.body,
+        createdAt: c.createdAt,
+      })),
     })),
     ...wantToTrys.map((w) => ({
       type: "want_to_try" as const,
@@ -88,8 +122,17 @@ export async function getFeed(userId: string, take = 30): Promise<FeedItem[]> {
       createdAt: w.createdAt,
       wantToTryId: w.id,
       name: w.name,
+      addedById: w.addedById,
       addedByName: w.addedBy.name,
       podName: w.pod?.name ?? "",
+      likedByUserIds: w.likes.map((l) => l.userId),
+      comments: w.comments.map((c) => ({
+        id: c.id,
+        authorId: c.userId,
+        authorName: c.user.name,
+        body: c.body,
+        createdAt: c.createdAt,
+      })),
     })),
   ];
 

@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { updateSettings, type SettingsState } from "@/lib/actions/profile";
 import { SubmitButton } from "@/components/submit-button";
+import { PhotoInput } from "@/components/photo-input";
 import { Avatar } from "@/components/avatar";
 
 const initialState: SettingsState = {};
@@ -18,6 +19,7 @@ export function SettingsForm({
 }) {
   const [state, formAction] = useActionState(updateSettings, initialState);
   const [preview, setPreview] = useState<string | null>(null);
+  const [photoTooLarge, setPhotoTooLarge] = useState(false);
 
   return (
     <form action={formAction} className="mt-6 flex flex-col gap-5">
@@ -38,14 +40,10 @@ export function SettingsForm({
           ) : (
             <Avatar name={currentName} avatarUrl={avatarUrl} size="lg" />
           )}
-          <input
-            type="file"
+          <PhotoInput
             name="avatar"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              setPreview(file ? URL.createObjectURL(file) : null);
-            }}
+            onFileSelected={(file) => setPreview(file ? URL.createObjectURL(file) : null)}
+            onValidityChange={setPhotoTooLarge}
             className="text-sm text-ink file:mr-3 file:rounded-full file:border-0 file:bg-sage-50 file:px-3 file:py-1.5 file:text-sage-900"
           />
         </div>
@@ -81,6 +79,7 @@ export function SettingsForm({
 
       <SubmitButton
         pendingText="Saving…"
+        disabled={photoTooLarge}
         className="w-fit rounded-full bg-sage-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-sage-900 disabled:opacity-60"
       >
         Save changes

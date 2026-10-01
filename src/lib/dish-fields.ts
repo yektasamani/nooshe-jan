@@ -28,9 +28,42 @@ export async function resolveTagIds(tagsRaw: string): Promise<string[]> {
   return tagIds;
 }
 
-/** Upload a dish (or avatar) photo to the shared bucket (docs/INFRA_SETUP.md
- * §6) and return its public URL, or an error message. */
-export async function uploadDishPhoto(
+/** Same visibility rule used on the dish detail page: a PRIVATE dish is
+ * only visible to whoever made or co-made it; PUBLIC is visible to any
+ * signed-in user. Shared here so reaction actions (likes/comments) gate
+ * on the exact same rule as viewing the dish itself. */
+export function canViewDish(
+  dish: { visibility: "PUBLIC" | "PRIVATE"; makerId: string; coMakers: { userId: string }[] },
+  userId: string,
+): boolean {
+  if (dish.visibility === "PUBLIC") return true;
+  return dish.makerId === userId || dish.coMakers.some((c) => c.userId === userId);
+}
+
+export type PhotoShape = "SQUARE" | "ORIGINAL";
+
+/** Pulls the "new photos" slots out of a dish create/edit submission —
+ * paired `newPhotos`/`newPhotoShapes` fields from PhotoGalleryField,
+ * skipping any slot left empty (an unfilled file input still submits an
+ * empty File, not nothing). */
+export function collectNewPhotos(formData: FormData): { file: File; shape: PhotoShape }[] {
+  const files = formData.getAll("newPhotos") as File[];
+  const shapes = formData.getAll("newPhotoShapes").map(String);
+  const result: { file: File; shape: PhotoShape }[] = [];
+  files.forEach((file, i) => {
+    if (file instanceof File && file.size > 0) {
+      result.push({ file, shape: shapes[i] === "ORIGINAL" ? "ORIGINAL" : "SQUARE" });
+    }
+  });
+  return result;
+}
+
+/** Upload any user-provided image (dish photo, want-to-try photo, pod
+ * cover, avatar) to the shared bucket (docs/INFRA_SETUP.md §6) and return
+ * its public URL, or an error message. Generic despite living in this
+ * file — kept here since dish photos were its original and still most
+ * common use. */
+export async function uploadImage(
   supabase: SupabaseClient,
   userId: string,
   photo: File,

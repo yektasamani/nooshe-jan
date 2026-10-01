@@ -3,6 +3,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
+import {
+  toggleDishLike,
+  addDishComment,
+  deleteDishComment,
+  addDishToMyWantToTry,
+} from "@/lib/actions/reactions";
+import { ReactionBar } from "@/components/reaction-bar";
 
 const TIER_LABEL: Record<string, string> = {
   LIKED: "Liked",
@@ -23,6 +30,9 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
       coMakers: { include: { user: true } },
       eaters: { include: { user: true } },
       tags: { include: { tag: true } },
+      likes: true,
+      comments: { include: { user: true }, orderBy: { createdAt: "asc" } },
+      photos: { orderBy: { position: "asc" } },
     },
   });
   if (!dish) notFound();
@@ -45,15 +55,32 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-8">
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-sage-50">
-        <Image
-          src={dish.photoUrl}
-          alt={dish.name}
-          fill
-          sizes="(max-width: 672px) 100vw, 672px"
-          className="object-cover"
-          priority
-        />
+      <div className="flex flex-col gap-3">
+        {(dish.photos.length > 0
+          ? dish.photos
+          : [{ id: "cover", url: dish.photoUrl, displayShape: "SQUARE" as const }]
+        ).map((photo, i) =>
+          photo.displayShape === "ORIGINAL" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={photo.id}
+              src={photo.url}
+              alt={dish.name}
+              className="w-full rounded-2xl bg-sage-50 object-contain"
+            />
+          ) : (
+            <div key={photo.id} className="relative aspect-square w-full overflow-hidden rounded-2xl bg-sage-50">
+              <Image
+                src={photo.url}
+                alt={dish.name}
+                fill
+                sizes="(max-width: 672px) 100vw, 672px"
+                className="object-cover"
+                priority={i === 0}
+              />
+            </div>
+          ),
+        )}
       </div>
 
       <div className="mt-6 flex items-start justify-between gap-4">
@@ -120,6 +147,26 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
         </ul>
       )}
 
+      <ReactionBar
+        idFieldName="dishId"
+        targetId={dish.id}
+        redirectTo={`/dishes/${dish.id}`}
+        liked={dish.likes.some((l) => l.userId === user.id)}
+        likeCount={dish.likes.length}
+        comments={dish.comments.map((c) => ({
+          id: c.id,
+          authorId: c.userId,
+          authorName: c.user.name,
+          body: c.body,
+          createdAt: c.createdAt,
+          isOwn: c.userId === user.id,
+        }))}
+        likeAction={toggleDishLike}
+        commentAction={addDishComment}
+        deleteCommentAction={deleteDishComment}
+        defaultOpen
+      />
+
       {dish.recipeUrl && (
         <p className="mt-4">
           <a
@@ -133,7 +180,7 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
         </p>
       )}
 
-      <div className="mt-8 flex gap-2">
+      <div className="mt-8 flex flex-wrap gap-2">
         {myRating ? (
           <Link
             href={`/dishes/${dish.id}/rerank`}
@@ -158,6 +205,17 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
           >
             Edit
           </Link>
+        )}
+        {!isMaker && !isCoMaker && (
+          <form action={addDishToMyWantToTry}>
+            <input type="hidden" name="dishId" value={dish.id} />
+            <button
+              type="submit"
+              className="inline-block rounded-full border border-sage-200 px-5 py-2.5 font-medium text-ink hover:border-sage-600"
+            >
+              Add to my want to try
+            </button>
+          </form>
         )}
       </div>
     </main>

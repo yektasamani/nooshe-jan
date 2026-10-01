@@ -4,6 +4,16 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { getFeed } from "@/lib/feed";
 import { timeAgo } from "@/lib/format";
+import {
+  toggleDishLike,
+  addDishComment,
+  deleteDishComment,
+  toggleWantToTryLike,
+  addWantToTryComment,
+  deleteWantToTryComment,
+  addDishToMyWantToTry,
+} from "@/lib/actions/reactions";
+import { ReactionBar } from "@/components/reaction-bar";
 
 export default async function FeedPage() {
   const user = await getCurrentUser();
@@ -31,50 +41,99 @@ export default async function FeedPage() {
         <ul className="mt-6 flex flex-col gap-3">
           {items.map((item) =>
             item.type === "dish" ? (
-              <li key={item.id}>
-                <Link
-                  href={`/dishes/${item.dishId}`}
-                  className="flex items-center gap-4 rounded-xl border border-sage-200/70 bg-white p-3 transition-colors hover:border-sage-600"
-                >
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-sage-50">
+              <li
+                key={item.id}
+                className="flex flex-col gap-2 rounded-xl border border-sage-200/70 bg-white p-3 transition-colors hover:border-sage-600"
+              >
+                <div className="flex items-center gap-4">
+                  <Link href={`/dishes/${item.dishId}`} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-sage-50">
                     <Image src={item.photoUrl} alt={item.dishName} fill sizes="56px" className="object-cover" />
-                  </div>
+                  </Link>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-ink">
-                      <span className="font-medium">{item.makerName}</span> logged{" "}
-                      <span className="font-display">{item.dishName}</span>
+                      <Link href={`/users/${item.makerId}`} className="font-medium hover:underline">
+                        {item.makerName}
+                      </Link>{" "}
+                      logged{" "}
+                      <Link href={`/dishes/${item.dishId}`} className="font-display hover:underline">
+                        {item.dishName}
+                      </Link>
                     </p>
                     <p className="truncate text-xs text-ink/50">
                       {item.cuisineName} · {timeAgo(item.createdAt)}
                     </p>
                   </div>
                   {item.score !== null && (
-                    <span className="font-display shrink-0 text-xl text-sage-600">
+                    <Link href={`/dishes/${item.dishId}`} className="font-display shrink-0 text-xl text-sage-600">
                       {item.score.toFixed(1)}
-                    </span>
+                    </Link>
                   )}
-                </Link>
+                  {item.makerId !== user.id && (
+                    <form action={addDishToMyWantToTry} className="shrink-0">
+                      <input type="hidden" name="dishId" value={item.dishId} />
+                      <button
+                        type="submit"
+                        className="rounded-full border border-sage-200 px-3 py-1.5 text-xs font-medium text-ink hover:border-sage-600"
+                      >
+                        + Want to try
+                      </button>
+                    </form>
+                  )}
+                </div>
+
+                <div className="border-t border-sage-100 pt-2">
+                  <ReactionBar
+                    idFieldName="dishId"
+                    targetId={item.dishId}
+                    redirectTo="/feed"
+                    liked={item.likedByUserIds.includes(user.id)}
+                    likeCount={item.likedByUserIds.length}
+                    comments={item.comments.map((c) => ({ ...c, isOwn: c.authorId === user.id }))}
+                    likeAction={toggleDishLike}
+                    commentAction={addDishComment}
+                    deleteCommentAction={deleteDishComment}
+                  />
+                </div>
               </li>
             ) : (
               <li
                 key={item.id}
-                className="flex items-center gap-4 rounded-xl border border-sage-200/70 bg-white p-3"
+                className="flex flex-col gap-2 rounded-xl border border-sage-200/70 bg-white p-3"
               >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-ink">
-                    <span className="font-medium">{item.addedByName}</span> added{" "}
-                    <span className="font-display">{item.name}</span> to want to try
-                  </p>
-                  <p className="truncate text-xs text-ink/50">
-                    {item.podName} · {timeAgo(item.createdAt)}
-                  </p>
+                <div className="flex items-center gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-ink">
+                      <Link href={`/users/${item.addedById}`} className="font-medium hover:underline">
+                        {item.addedByName}
+                      </Link>{" "}
+                      added{" "}
+                      <span className="font-display">{item.name}</span> to want to try
+                    </p>
+                    <p className="truncate text-xs text-ink/50">
+                      {item.podName} · {timeAgo(item.createdAt)}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/dishes/new?wantToTryId=${item.wantToTryId}`}
+                    className="shrink-0 rounded-full border border-sage-200 px-3 py-1.5 text-xs font-medium text-ink hover:border-sage-600"
+                  >
+                    Log it
+                  </Link>
                 </div>
-                <Link
-                  href={`/dishes/new?wantToTryId=${item.wantToTryId}`}
-                  className="shrink-0 rounded-full border border-sage-200 px-3 py-1.5 text-xs font-medium text-ink hover:border-sage-600"
-                >
-                  Log it
-                </Link>
+
+                <div className="border-t border-sage-100 pt-2">
+                  <ReactionBar
+                    idFieldName="wantToTryId"
+                    targetId={item.wantToTryId}
+                    redirectTo="/feed"
+                    liked={item.likedByUserIds.includes(user.id)}
+                    likeCount={item.likedByUserIds.length}
+                    comments={item.comments.map((c) => ({ ...c, isOwn: c.authorId === user.id }))}
+                    likeAction={toggleWantToTryLike}
+                    commentAction={addWantToTryComment}
+                    deleteCommentAction={deleteWantToTryComment}
+                  />
+                </div>
               </li>
             ),
           )}

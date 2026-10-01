@@ -50,6 +50,10 @@ model User {
   podMemberships          PodMember[]
   comparisonsAsChallenger PairwiseComparison[] @relation("ComparisonUser")
   bugReports              BugReport[]
+  dishLikes               DishLike[]
+  dishComments            DishComment[]
+  wantToTryLikes          WantToTryLike[]
+  wantToTryComments       WantToTryComment[]
 
   @@map("users")
 }
@@ -83,9 +87,13 @@ model Tag {
 
 /// A group of users sharing a combined ranked view (spec §1 Pod).
 model Pod {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  createdAt DateTime @default(now())
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  /// optional, same idea as a user's avatar — any active member can set
+  /// or change it (no owner concept, spec extension per pod removal
+  /// design — symmetric permissions throughout).
+  coverPhotoUrl String?
+  createdAt     DateTime @default(now())
 
   members     PodMember[]
   wantToTries WantToTry[]
@@ -133,10 +141,40 @@ model Dish {
   comparisonsAsB PairwiseComparison[] @relation("DishB")
   comparisonsWon PairwiseComparison[] @relation("Winner")
   convertedFrom  WantToTry?
+  likes          DishLike[]
+  comments       DishComment[]
+  photos         DishPhoto[]
 
   @@index([makerId])
   @@index([cuisineId])
   @@map("dishes")
+}
+
+enum DishPhotoShape {
+  SQUARE
+  ORIGINAL
+}
+
+/// One of possibly several photos for a dish (spec extension — originally
+/// a dish had exactly one photo, mirrored onto Dish.photoUrl as the
+/// "cover" everywhere a single thumbnail is shown: feed, personal rank,
+/// pod combined view, profile). The full gallery — and each photo's own
+/// display-shape choice — only shows on the dish detail page.
+model DishPhoto {
+  id           String         @id @default(uuid()) @db.Uuid
+  dishId       String         @db.Uuid
+  url          String
+  /// square-cropped for a consistent grid, or shown at its native aspect
+  /// ratio — per-photo, since forcing every shot into a square can look
+  /// worse for some than others.
+  displayShape DishPhotoShape @default(SQUARE)
+  position     Int            @default(0)
+  createdAt    DateTime       @default(now())
+
+  dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+
+  @@index([dishId])
+  @@map("dish_photos")
 }
 
 /// "Who ate it" — many-to-many, defaults to [maker] in the app layer.
@@ -177,6 +215,36 @@ model DishTag {
 
   @@id([dishId, tagId])
   @@map("dish_tags")
+}
+
+/// A one-tap "nice" on a logged dish — same viewers who can see the dish
+/// can like it (spec extension: social layer on top of ranking).
+model DishLike {
+  dishId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([dishId, userId])
+  @@map("dish_likes")
+}
+
+/// A comment thread on a logged dish. Author-only delete, no maker
+/// moderation — same trust boundary as everything else here (family-only).
+model DishComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  dishId    String   @db.Uuid
+  userId    String   @db.Uuid
+  body      String
+  createdAt DateTime @default(now())
+
+  dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([dishId])
+  @@map("dish_comments")
 }
 
 /// A user's personal placement of a dish in their own ranked list
@@ -243,7 +311,39 @@ model WantToTry {
   convertedToDishId String? @unique @db.Uuid
   convertedToDish   Dish?   @relation(fields: [convertedToDishId], references: [id])
 
+  likes    WantToTryLike[]
+  comments WantToTryComment[]
+
   @@map("want_to_trys")
+}
+
+/// A one-tap "nice" on a want-to-try idea — same viewers as the idea
+/// itself (the adder, plus anyone in its pod).
+model WantToTryLike {
+  wantToTryId String   @db.Uuid
+  userId      String   @db.Uuid
+  createdAt   DateTime @default(now())
+
+  wantToTry WantToTry @relation(fields: [wantToTryId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([wantToTryId, userId])
+  @@map("want_to_try_likes")
+}
+
+/// A comment thread on a want-to-try idea. Author-only delete.
+model WantToTryComment {
+  id          String   @id @default(uuid()) @db.Uuid
+  wantToTryId String   @db.Uuid
+  userId      String   @db.Uuid
+  body        String
+  createdAt   DateTime @default(now())
+
+  wantToTry WantToTry @relation(fields: [wantToTryId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([wantToTryId])
+  @@map("want_to_try_comments")
 }
 
 /// A user-submitted bug report — beta-testing feedback channel while the

@@ -24,7 +24,7 @@ export default async function SearchPage({
           type="text"
           name="q"
           defaultValue={q ?? ""}
-          placeholder="Search by name"
+          placeholder="Find a person by name"
           autoFocus
           className="flex-1 rounded-lg border border-sage-200 bg-white px-3.5 py-2.5 text-ink outline-none focus:border-sage-600"
         />

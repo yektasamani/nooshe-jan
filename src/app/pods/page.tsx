@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { createPod, acceptPodInvite, declinePodInvite } from "@/lib/actions/pods";
 import { SubmitButton } from "@/components/submit-button";
+import { Avatar } from "@/components/avatar";
 
 export default async function PodsPage() {
   const user = await getCurrentUser();
@@ -73,10 +74,13 @@ export default async function PodsPage() {
             <li key={pod.id}>
               <Link
                 href={`/pods/${pod.id}`}
-                className="flex items-center justify-between rounded-xl border border-sage-200/70 bg-white p-4 transition-colors hover:border-sage-600"
+                className="flex items-center justify-between gap-3 rounded-xl border border-sage-200/70 bg-white p-4 transition-colors hover:border-sage-600"
               >
-                <span className="font-display text-lg text-ink">{pod.name}</span>
-                <span className="text-sm text-ink/50">
+                <span className="flex items-center gap-3">
+                  <Avatar name={pod.name} avatarUrl={pod.coverPhotoUrl} size="md" />
+                  <span className="font-display text-lg text-ink">{pod.name}</span>
+                </span>
+                <span className="shrink-0 text-sm text-ink/50">
                   {pod.members.length} {pod.members.length === 1 ? "member" : "members"}
                 </span>
               </Link>

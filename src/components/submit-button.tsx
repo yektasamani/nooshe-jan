@@ -12,14 +12,18 @@ export function SubmitButton({
   children,
   pendingText,
   className,
+  disabled = false,
 }: {
   children: ReactNode;
   pendingText?: string;
   className?: string;
+  /** Blocks submission for a reason outside form-status pending-ness —
+   * e.g. an oversized photo picked via PhotoInput. */
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} className={className}>
+    <button type="submit" disabled={pending || disabled} className={className}>
       {pending ? (pendingText ?? "Saving…") : children}
     </button>
   );

@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { CreateDishState } from "@/lib/actions/dishes";
+import { PhotoGalleryField, type ExistingDishPhoto } from "@/components/photo-gallery-field";
 
 const initialState: CreateDishState = {};
 
@@ -14,7 +15,7 @@ export function AddDishForm({
   currentUserName,
   podMates,
   initialName,
-  initialPhotoUrl,
+  initialPhotos = [],
   initialRegionId,
   initialCuisineName,
   initialNotes,
@@ -37,8 +38,8 @@ export function AddDishForm({
   currentUserName: string;
   podMates: { id: string; name: string }[];
   initialName?: string;
-  /** Edit mode only — shown as a preview; photo becomes optional to replace. */
-  initialPhotoUrl?: string;
+  /** Edit mode only — existing photos, each editable/removable in place. */
+  initialPhotos?: ExistingDishPhoto[];
   initialRegionId?: string;
   initialCuisineName?: string;
   initialNotes?: string;
@@ -53,6 +54,7 @@ export function AddDishForm({
   pendingLabel?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const [photoTooLarge, setPhotoTooLarge] = useState(false);
   const isEdit = Boolean(dishId);
   const isPrivateDefault = initialVisibility ? initialVisibility === "PRIVATE" : privateByDefault;
 
@@ -79,27 +81,12 @@ export function AddDishForm({
         />
       </label>
 
-      <label className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-ink/80">
-          Photo {!isEdit && <span className="text-sage-600">*</span>}
+          Photos {!isEdit && <span className="text-sage-600">*</span>}
         </span>
-        {initialPhotoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={initialPhotoUrl}
-            alt=""
-            className="h-24 w-24 rounded-lg object-cover"
-          />
-        )}
-        <input
-          type="file"
-          name="photo"
-          accept="image/*"
-          required={!isEdit}
-          className="rounded-lg border border-sage-200 bg-white px-3.5 py-2.5 text-ink file:mr-3 file:rounded-full file:border-0 file:bg-sage-50 file:px-3 file:py-1.5 file:text-sage-900"
-        />
-        {isEdit && <span className="text-xs text-ink/50">Leave blank to keep the current photo.</span>}
-      </label>
+        <PhotoGalleryField existingPhotos={initialPhotos} onValidityChange={setPhotoTooLarge} />
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1.5">
@@ -245,7 +232,7 @@ export function AddDishForm({
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || photoTooLarge}
         className="mt-2 rounded-full bg-sage-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-sage-900 disabled:opacity-60"
       >
         {pending ? pendingLabel : submitLabel}

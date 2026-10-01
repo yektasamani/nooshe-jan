@@ -10,7 +10,7 @@ const LEFT_LINKS = [
 ];
 const RIGHT_LINKS = [
   { href: "/want-to-try", label: "Want to try", Icon: WantToTryIcon },
-  { href: "/search", label: "Search", Icon: SearchIcon },
+  { href: "/search", label: "Find people", Icon: SearchIcon },
 ];
 
 /** Fixed bottom tab bar, mobile only — "Log a dish" sits elevated in the

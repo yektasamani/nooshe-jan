@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { createWantToTry } from "@/lib/actions/want-to-try";
-import { SubmitButton } from "@/components/submit-button";
+import { WantToTryForm } from "@/components/want-to-try-form";
 
 export default async function NewWantToTryPage() {
   const user = await getCurrentUser();
@@ -20,70 +20,7 @@ export default async function NewWantToTryPage() {
         Nothing to rank yet. Just a place to remember what&apos;s next.
       </p>
 
-      <form action={createWantToTry} className="mt-8 flex flex-col gap-5">
-        <p className="text-xs text-ink/50">
-          <span className="text-sage-600">*</span> Required
-        </p>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-ink/80">
-            Name <span className="text-sage-600">*</span>
-          </span>
-          <input
-            type="text"
-            name="name"
-            required
-            placeholder="Tahchin"
-            className="rounded-lg border border-sage-200 bg-white px-3.5 py-2.5 text-ink outline-none focus:border-sage-600"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-ink/80">Photo</span>
-          <input
-            type="file"
-            name="photo"
-            accept="image/*"
-            className="rounded-lg border border-sage-200 bg-white px-3.5 py-2.5 text-ink file:mr-3 file:rounded-full file:border-0 file:bg-sage-50 file:px-3 file:py-1.5 file:text-sage-900"
-          />
-          <span className="text-xs text-ink/50">Add a photo or a link if you have one. Both optional.</span>
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-ink/80">Link</span>
-          <input
-            type="url"
-            name="link"
-            placeholder="https:// (optional)"
-            className="rounded-lg border border-sage-200 bg-white px-3.5 py-2.5 text-ink outline-none focus:border-sage-600"
-          />
-        </label>
-
-        {memberships.length > 0 && (
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-ink/80">Pod (optional)</span>
-            <select
-              name="podId"
-              defaultValue=""
-              className="rounded-lg border border-sage-200 bg-white px-3.5 py-2.5 text-ink outline-none focus:border-sage-600"
-            >
-              <option value="">Just for me</option>
-              {memberships.map(({ pod }) => (
-                <option key={pod.id} value={pod.id}>
-                  {pod.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        <SubmitButton
-          pendingText="Adding…"
-          className="mt-2 rounded-full bg-sage-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-sage-900 disabled:opacity-60"
-        >
-          Add to the list
-        </SubmitButton>
-      </form>
+      <WantToTryForm action={createWantToTry} memberships={memberships} />
     </main>
   );
 }
