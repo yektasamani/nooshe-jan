@@ -3,8 +3,7 @@
 import { useActionState, useState } from "react";
 import { updateSettings, type SettingsState } from "@/lib/actions/profile";
 import { SubmitButton } from "@/components/submit-button";
-import { PhotoInput } from "@/components/photo-input";
-import { Avatar } from "@/components/avatar";
+import { AvatarPhotoPicker } from "@/components/avatar-photo-picker";
 
 const initialState: SettingsState = {};
 
@@ -18,35 +17,19 @@ export function SettingsForm({
   privateByDefault: boolean;
 }) {
   const [state, formAction] = useActionState(updateSettings, initialState);
-  const [preview, setPreview] = useState<string | null>(null);
   const [photoTooLarge, setPhotoTooLarge] = useState(false);
 
   return (
     <form action={formAction} className="mt-6 flex flex-col gap-5">
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-ink/80">Photo</span>
-        <div className="flex items-center gap-4">
-          {preview ? (
-            // Plain <img> for the local blob: preview — next/image can't
-            // optimize a blob URL (it only handles http(s) remote images
-            // or same-origin paths), and this is a transient client-only
-            // preview anyway, never sent anywhere.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={preview}
-              alt={currentName}
-              className="h-24 w-24 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <Avatar name={currentName} avatarUrl={avatarUrl} size="lg" />
-          )}
-          <PhotoInput
-            name="avatar"
-            onFileSelected={(file) => setPreview(file ? URL.createObjectURL(file) : null)}
-            onValidityChange={setPhotoTooLarge}
-            className="text-sm text-ink file:mr-3 file:rounded-full file:border-0 file:bg-sage-50 file:px-3 file:py-1.5 file:text-sage-900"
-          />
-        </div>
+        <AvatarPhotoPicker
+          name="avatar"
+          currentName={currentName}
+          currentPhotoUrl={avatarUrl}
+          size="lg"
+          onValidityChange={setPhotoTooLarge}
+        />
       </label>
 
       <label className="flex flex-col gap-1.5">

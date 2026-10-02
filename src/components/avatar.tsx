@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-const SIZE_CLASSES: Record<"sm" | "md" | "lg", string> = {
+export const AVATAR_SIZE_CLASSES: Record<"sm" | "md" | "lg", string> = {
   sm: "h-7 w-7 text-xs",
   md: "h-10 w-10 text-sm",
   lg: "h-24 w-24 text-2xl",
@@ -29,14 +29,14 @@ export function Avatar({
 }) {
   if (avatarUrl) {
     return (
-      <div className={`relative shrink-0 overflow-hidden rounded-full bg-sage-50 ${SIZE_CLASSES[size]}`}>
+      <div className={`relative shrink-0 overflow-hidden rounded-full bg-sage-50 ${AVATAR_SIZE_CLASSES[size]}`}>
         <Image src={avatarUrl} alt={name} fill sizes={SIZE_PX[size]} className="object-cover" />
       </div>
     );
   }
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-full bg-sage-200 font-medium text-sage-900 ${SIZE_CLASSES[size]}`}
+      className={`flex shrink-0 items-center justify-center rounded-full bg-sage-200 font-medium text-sage-900 ${AVATAR_SIZE_CLASSES[size]}`}
     >
       {initials(name) || "?"}
     </div>

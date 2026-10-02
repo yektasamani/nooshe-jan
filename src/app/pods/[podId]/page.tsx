@@ -14,7 +14,6 @@ import { CopyInviteLink } from "@/components/copy-invite-link";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { DishFilterChips, Chip, buildFilterHref } from "@/components/filter-chips";
-import { Avatar } from "@/components/avatar";
 import { PodPhotoForm } from "@/components/pod-photo-form";
 
 export default async function PodPage({
@@ -81,13 +80,13 @@ export default async function PodPage({
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-8">
       <div className="flex items-center gap-4">
-        <Avatar name={pod.name} avatarUrl={pod.coverPhotoUrl} size="lg" />
-        <div>
-          <h1 className="font-display text-2xl text-sage-900">{pod.name}</h1>
-          <div className="mt-2">
-            <PodPhotoForm podId={pod.id} action={updatePodPhoto} />
-          </div>
-        </div>
+        <PodPhotoForm
+          podId={pod.id}
+          podName={pod.name}
+          coverPhotoUrl={pod.coverPhotoUrl}
+          action={updatePodPhoto}
+        />
+        <h1 className="font-display text-2xl text-sage-900">{pod.name}</h1>
       </div>
 
       <ul className="mt-4 flex flex-wrap gap-1.5">

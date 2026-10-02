@@ -14,19 +14,16 @@ export function PhotoInput({
   required = false,
   className,
   onValidityChange,
-  onFileSelected,
 }: {
   name: string;
   required?: boolean;
   className?: string;
   onValidityChange?: (tooLarge: boolean) => void;
-  onFileSelected?: (file: File | null) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
-    onFileSelected?.(file);
 
     if (file && file.size > MAX_PHOTO_BYTES) {
       const message = `That photo is too big (over ${MAX_PHOTO_LABEL}). Pick a smaller one.`;
