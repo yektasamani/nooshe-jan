@@ -25,7 +25,10 @@ export async function toggleDishLike(formData: FormData): Promise<void> {
   const dishId = String(formData.get("dishId"));
   const to = redirectTarget(formData, `/dishes/${dishId}`);
 
-  const dish = await prisma.dish.findUnique({ where: { id: dishId }, include: { coMakers: true } });
+  const dish = await prisma.dish.findUnique({
+    where: { id: dishId },
+    include: { coMakers: true, eaters: true },
+  });
   if (!dish || !canViewDish(dish, userId)) redirect(to);
 
   const existing = await prisma.dishLike.findUnique({ where: { dishId_userId: { dishId, userId } } });
@@ -46,7 +49,10 @@ export async function addDishComment(formData: FormData): Promise<void> {
   const body = String(formData.get("body") ?? "").trim();
   if (!body) redirect(to);
 
-  const dish = await prisma.dish.findUnique({ where: { id: dishId }, include: { coMakers: true } });
+  const dish = await prisma.dish.findUnique({
+    where: { id: dishId },
+    include: { coMakers: true, eaters: true },
+  });
   if (!dish || !canViewDish(dish, userId)) redirect(to);
 
   await prisma.dishComment.create({ data: { dishId, userId, body } });
@@ -129,7 +135,10 @@ export async function addDishToMyWantToTry(formData: FormData): Promise<void> {
   const userId = await requireUserId();
   const dishId = String(formData.get("dishId"));
 
-  const dish = await prisma.dish.findUnique({ where: { id: dishId }, include: { coMakers: true } });
+  const dish = await prisma.dish.findUnique({
+    where: { id: dishId },
+    include: { coMakers: true, eaters: true },
+  });
   if (!dish || !canViewDish(dish, userId)) redirect("/");
 
   await prisma.wantToTry.create({

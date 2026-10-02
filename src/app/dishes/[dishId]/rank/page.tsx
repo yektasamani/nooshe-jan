@@ -3,6 +3,7 @@ import type { RatingTier } from "@prisma/client";
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { buildComparisonPool } from "@/lib/ranking";
+import { canRankDish } from "@/lib/dish-fields";
 import { ComparisonScreen } from "@/components/comparison-screen";
 import { TierPicker } from "@/components/tier-picker";
 
@@ -23,11 +24,10 @@ export default async function RankDishPage({
   const { dishId } = await params;
   const dish = await prisma.dish.findUnique({
     where: { id: dishId },
-    include: { cuisine: true, coMakers: true },
+    include: { cuisine: true, coMakers: true, eaters: true },
   });
   if (!dish) redirect("/");
-  const canRank = dish.makerId === user.id || dish.coMakers.some((c) => c.userId === user.id);
-  if (!canRank) redirect("/");
+  if (!canRankDish(dish, user.id)) redirect("/");
 
   const alreadyRanked = await prisma.rating.findUnique({
     where: { userId_dishId: { userId: user.id, dishId } },

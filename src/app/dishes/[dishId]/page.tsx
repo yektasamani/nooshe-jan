@@ -9,6 +9,7 @@ import {
   deleteDishComment,
   addDishToMyWantToTry,
 } from "@/lib/actions/reactions";
+import { canRankDish } from "@/lib/dish-fields";
 import { ReactionBar } from "@/components/reaction-bar";
 
 const TIER_LABEL: Record<string, string> = {
@@ -39,11 +40,12 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
 
   const isMaker = dish.makerId === user.id;
   const isCoMaker = dish.coMakers.some((c) => c.userId === user.id);
+  const isEater = dish.eaters.some((e) => e.userId === user.id);
+  const canRank = canRankDish(dish, user.id);
 
-  // No pods/sharing yet (spec §5, still open) — for now a private dish is
-  // visible only to whoever made it (primary or co-maker); a public one is
-  // visible to any signed-in user.
-  if (dish.visibility === "PRIVATE" && !isMaker && !isCoMaker) notFound();
+  // A private dish is visible to whoever made, co-made, or ate it; a
+  // public one is visible to any signed-in user.
+  if (dish.visibility === "PRIVATE" && !isMaker && !isCoMaker && !isEater) notFound();
 
   const ratings = await prisma.rating.findMany({
     where: { dishId },
@@ -189,7 +191,7 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
             Re-rank
           </Link>
         ) : (
-          (isMaker || isCoMaker) && (
+          canRank && (
             <Link
               href={`/dishes/${dish.id}/rank`}
               className="inline-block rounded-full bg-sage-600 px-5 py-2.5 font-medium text-white hover:bg-sage-900"
@@ -206,7 +208,7 @@ export default async function DishDetailPage({ params }: { params: Promise<{ dis
             Edit
           </Link>
         )}
-        {!isMaker && !isCoMaker && (
+        {!canRank && (
           <form action={addDishToMyWantToTry}>
             <input type="hidden" name="dishId" value={dish.id} />
             <button

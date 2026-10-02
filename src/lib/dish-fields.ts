@@ -29,15 +29,40 @@ export async function resolveTagIds(tagsRaw: string): Promise<string[]> {
 }
 
 /** Same visibility rule used on the dish detail page: a PRIVATE dish is
- * only visible to whoever made or co-made it; PUBLIC is visible to any
- * signed-in user. Shared here so reaction actions (likes/comments) gate
- * on the exact same rule as viewing the dish itself. */
+ * only visible to whoever made, co-made, or ate it; PUBLIC is visible to
+ * any signed-in user. Shared here so reaction actions (likes/comments)
+ * and ranking access gate on the exact same rule as viewing the dish
+ * itself. */
 export function canViewDish(
-  dish: { visibility: "PUBLIC" | "PRIVATE"; makerId: string; coMakers: { userId: string }[] },
+  dish: {
+    visibility: "PUBLIC" | "PRIVATE";
+    makerId: string;
+    coMakers: { userId: string }[];
+    eaters: { userId: string }[];
+  },
   userId: string,
 ): boolean {
   if (dish.visibility === "PUBLIC") return true;
-  return dish.makerId === userId || dish.coMakers.some((c) => c.userId === userId);
+  return (
+    dish.makerId === userId ||
+    dish.coMakers.some((c) => c.userId === userId) ||
+    dish.eaters.some((e) => e.userId === userId)
+  );
+}
+
+/** Who's allowed to rank a dish in their own personal list: the maker,
+ * any co-maker, or anyone who ate it (spec intent: the point is for
+ * whoever actually had the dish to be able to rank it, not just whoever
+ * made or helped make it). */
+export function canRankDish(
+  dish: { makerId: string; coMakers: { userId: string }[]; eaters: { userId: string }[] },
+  userId: string,
+): boolean {
+  return (
+    dish.makerId === userId ||
+    dish.coMakers.some((c) => c.userId === userId) ||
+    dish.eaters.some((e) => e.userId === userId)
+  );
 }
 
 export type PhotoShape = "SQUARE" | "ORIGINAL";

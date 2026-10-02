@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { getWantToTryItems } from "@/lib/want-to-try";
-import { getUnrankedMadeDishes } from "@/lib/unranked-dishes";
+import { getUnrankedDishes } from "@/lib/unranked-dishes";
 import { deriveFilterOptions, filterRatings, type MakerFilter } from "@/lib/personal-rank";
 import { DishFilterChips, buildFilterHref } from "@/components/filter-chips";
 
@@ -56,7 +56,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
 
     // Personal rank (spec §2/§3) — every dish this user has ranked, sorted
     // by their own pairwise position, best first.
-    const [allRatings, unrankedMadeDishes] = await Promise.all([
+    const [allRatings, unrankedDishes] = await Promise.all([
         prisma.rating.findMany({
             where: { userId: user.id },
             include: {
@@ -66,7 +66,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
             },
             orderBy: { position: "asc" },
         }),
-        getUnrankedMadeDishes(user.id),
+        getUnrankedDishes(user.id),
     ]);
 
     // Filter chips (spec §2.2: maker / cuisine / tags / made vs. want-to-try).
@@ -83,15 +83,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-8">
             <h1 className="font-display text-2xl text-sage-900">Your rank</h1>
 
-            {unrankedMadeDishes.length > 0 && (
+            {unrankedDishes.length > 0 && (
                 <div className="mt-4 rounded-xl border border-sage-200 bg-sage-50/60 p-3">
                     <p className="text-sm font-medium text-sage-900">
-                        {unrankedMadeDishes.length === 1
-                            ? "You made this, but haven't ranked it yet"
-                            : `You made ${unrankedMadeDishes.length} dishes you haven't ranked yet`}
+                        {unrankedDishes.length === 1
+                            ? "You tried this, but haven't ranked it yet"
+                            : `You tried ${unrankedDishes.length} dishes you haven't ranked yet`}
                     </p>
                     <ul className="mt-2 flex flex-col gap-2">
-                        {unrankedMadeDishes.map((dish) => (
+                        {unrankedDishes.map((dish) => (
                             <li key={dish.id} className="flex items-center gap-3">
                                 <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-sage-100">
                                     <Image

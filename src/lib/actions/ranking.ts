@@ -6,6 +6,7 @@ import type { RatingTier } from "@prisma/client";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { bandStartPosition, buildComparisonPool, insertRatingAndRescore } from "@/lib/ranking";
+import { canRankDish } from "@/lib/dish-fields";
 
 async function requireUserId() {
   const supabase = await createClient();
@@ -19,14 +20,14 @@ async function requireUserId() {
 async function loadUnrankedDish(userId: string, dishId: string) {
   const dish = await prisma.dish.findUnique({
     where: { id: dishId },
-    include: { cuisine: true, coMakers: true },
+    include: { cuisine: true, coMakers: true, eaters: true },
   });
   if (!dish) redirect("/");
-  // Co-makers can rank a dish they helped cook, same as the primary maker
-  // (spec §3 extension: ranking is per-user, "who made it" and "who's
-  // ranked it" are separate).
-  const canRank = dish.makerId === userId || dish.coMakers.some((c) => c.userId === userId);
-  if (!canRank) redirect("/");
+  // The point is for whoever actually had the dish to be able to rank it
+  // — maker, co-maker, or anyone marked as having eaten it (spec §3
+  // extension: ranking is per-user, "who made it" and "who's ranked it"
+  // are separate).
+  if (!canRankDish(dish, userId)) redirect("/");
   const existingRating = await prisma.rating.findUnique({ where: { userId_dishId: { userId, dishId } } });
   if (existingRating) redirect("/"); // already ranked, nothing left to do
   return dish;
