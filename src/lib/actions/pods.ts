@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
-import { uploadImage } from "@/lib/dish-fields";
+import { isOwnedImageUrl } from "@/lib/dish-fields";
 
 async function requireUserId() {
   const supabase = await createClient();
@@ -123,7 +123,6 @@ export async function leavePod(formData: FormData): Promise<void> {
  * symmetric-permission philosophy as the rest of pod management (no
  * owner concept). */
 export async function updatePodPhoto(formData: FormData): Promise<void> {
-  const supabase = await createClient();
   const userId = await requireUserId();
   const podId = String(formData.get("podId"));
 
@@ -132,12 +131,13 @@ export async function updatePodPhoto(formData: FormData): Promise<void> {
   });
   if (!membership) redirect("/pods");
 
-  const photo = formData.get("photo") as File | null;
-  if (photo && photo.size > 0) {
-    const uploaded = await uploadImage(supabase, userId, photo);
-    if (!("error" in uploaded)) {
-      await prisma.pod.update({ where: { id: podId }, data: { coverPhotoUrl: uploaded.url } });
-    }
+  // Uploaded client-side before this ever submits (Vercel's 4.5MB
+  // serverless body limit rules out sending the raw file through a
+  // Server Action) — double-check it actually belongs to this user
+  // before trusting it.
+  const photoUrl = String(formData.get("photo") ?? "").trim();
+  if (photoUrl && isOwnedImageUrl(photoUrl, userId)) {
+    await prisma.pod.update({ where: { id: podId }, data: { coverPhotoUrl: photoUrl } });
   }
 
   revalidatePath(`/pods/${podId}`);

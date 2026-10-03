@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { isOwnedImageUrl } from "@/lib/dish-fields";
 
 export type SettingsState = {
   error?: string;
@@ -29,17 +30,13 @@ export async function updateSettings(
   if (!name) return { error: "Name can't be empty." };
 
   const privateByDefault = formData.get("privateByDefault") === "on";
-  const avatar = formData.get("avatar") as File | null;
-
-  let avatarUrl: string | undefined;
-  if (avatar && avatar.size > 0) {
-    const bucket = process.env.NEXT_PUBLIC_SUPABASE_DISH_PHOTOS_BUCKET!;
-    const ext = avatar.name.split(".").pop() || "jpg";
-    const path = `${user.id}/avatar/${crypto.randomUUID()}.${ext}`;
-    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, avatar);
-    if (uploadError) return { error: `Photo upload failed: ${uploadError.message}` };
-    avatarUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
-  }
+  // Uploaded client-side before this ever submits (Vercel's 4.5MB
+  // serverless body limit rules out sending the raw file through a
+  // Server Action) — double-check it actually belongs to this user
+  // before trusting it.
+  const submittedAvatarUrl = String(formData.get("avatar") ?? "").trim();
+  const avatarUrl =
+    submittedAvatarUrl && isOwnedImageUrl(submittedAvatarUrl, user.id) ? submittedAvatarUrl : undefined;
 
   await prisma.user.update({
     where: { id: user.id },

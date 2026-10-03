@@ -19,7 +19,7 @@ export function PodPhotoForm({
   action: (formData: FormData) => void;
 }) {
   const [hasFile, setHasFile] = useState(false);
-  const [photoTooLarge, setPhotoTooLarge] = useState(false);
+  const [blocked, setBlocked] = useState(false);
 
   return (
     <form action={action} className="flex items-center gap-3">
@@ -29,13 +29,13 @@ export function PodPhotoForm({
         currentName={podName}
         currentPhotoUrl={coverPhotoUrl}
         size="lg"
-        onFileChange={(file) => setHasFile(Boolean(file))}
-        onValidityChange={setPhotoTooLarge}
+        onPickedChange={setHasFile}
+        onValidityChange={setBlocked}
       />
       {hasFile && (
         <SubmitButton
           pendingText="…"
-          disabled={photoTooLarge}
+          disabled={blocked}
           className="shrink-0 rounded-full border border-sage-200 px-3 py-1.5 text-xs font-medium text-ink hover:border-sage-600 disabled:opacity-60"
         >
           Save photo

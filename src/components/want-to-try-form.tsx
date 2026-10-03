@@ -26,7 +26,8 @@ export function WantToTryForm({
   submitLabel?: string;
   pendingLabel?: string;
 }) {
-  const [photoTooLarge, setPhotoTooLarge] = useState(false);
+  const [photoBlocked, setPhotoBlocked] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const isEdit = Boolean(itemId);
 
   return (
@@ -58,10 +59,11 @@ export function WantToTryForm({
           <img src={initialPhotoUrl} alt="" className="h-24 w-24 rounded-lg object-cover" />
         )}
         <PhotoInput
-          name="photo"
-          onValidityChange={setPhotoTooLarge}
+          onValidityChange={setPhotoBlocked}
+          onUploaded={setPhotoUrl}
           className="rounded-lg border border-sage-200 bg-white px-3.5 py-2.5 text-ink file:mr-3 file:rounded-full file:border-0 file:bg-sage-50 file:px-3 file:py-1.5 file:text-sage-900"
         />
+        {photoUrl && <input type="hidden" name="photo" value={photoUrl} />}
         <span className="text-xs text-ink/50">
           {isEdit ? "Leave blank to keep the current photo." : "Add a photo or a link if you have one. Both optional."}
         </span>
@@ -98,7 +100,7 @@ export function WantToTryForm({
 
       <SubmitButton
         pendingText={pendingLabel}
-        disabled={photoTooLarge}
+        disabled={photoBlocked}
         className="mt-2 w-fit rounded-full bg-sage-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-sage-900 disabled:opacity-60"
       >
         {submitLabel}

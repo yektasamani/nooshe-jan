@@ -54,7 +54,7 @@ export function AddDishForm({
   pendingLabel?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
-  const [photoTooLarge, setPhotoTooLarge] = useState(false);
+  const [photoBlocked, setPhotoBlocked] = useState(false);
   const isEdit = Boolean(dishId);
   const isPrivateDefault = initialVisibility ? initialVisibility === "PRIVATE" : privateByDefault;
 
@@ -85,7 +85,7 @@ export function AddDishForm({
         <span className="text-sm font-medium text-ink/80">
           Photos {!isEdit && <span className="text-sage-600">*</span>}
         </span>
-        <PhotoGalleryField existingPhotos={initialPhotos} onValidityChange={setPhotoTooLarge} />
+        <PhotoGalleryField existingPhotos={initialPhotos} onValidityChange={setPhotoBlocked} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -232,7 +232,7 @@ export function AddDishForm({
 
       <button
         type="submit"
-        disabled={pending || photoTooLarge}
+        disabled={pending || photoBlocked}
         className="mt-2 rounded-full bg-sage-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-sage-900 disabled:opacity-60"
       >
         {pending ? pendingLabel : submitLabel}

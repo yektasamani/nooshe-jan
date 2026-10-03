@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
 
 /** Resolve/create the cuisine — search-or-create, always nested under the
@@ -68,35 +67,30 @@ export function canRankDish(
 export type PhotoShape = "SQUARE" | "ORIGINAL";
 
 /** Pulls the "new photos" slots out of a dish create/edit submission —
- * paired `newPhotos`/`newPhotoShapes` fields from PhotoGalleryField,
- * skipping any slot left empty (an unfilled file input still submits an
- * empty File, not nothing). */
-export function collectNewPhotos(formData: FormData): { file: File; shape: PhotoShape }[] {
-  const files = formData.getAll("newPhotos") as File[];
+ * paired `newPhotoUrls`/`newPhotoShapes` fields from PhotoGalleryField.
+ * Photos are uploaded client-side (see src/lib/upload-client.ts) before
+ * the form ever submits, so this receives already-uploaded URLs, not raw
+ * files — each one still gets checked with isOwnedImageUrl before it's
+ * trusted enough to save. */
+export function collectNewPhotos(formData: FormData): { url: string; shape: PhotoShape }[] {
+  const urls = formData.getAll("newPhotoUrls").map(String);
   const shapes = formData.getAll("newPhotoShapes").map(String);
-  const result: { file: File; shape: PhotoShape }[] = [];
-  files.forEach((file, i) => {
-    if (file instanceof File && file.size > 0) {
-      result.push({ file, shape: shapes[i] === "ORIGINAL" ? "ORIGINAL" : "SQUARE" });
-    }
-  });
-  return result;
+  return urls
+    .filter(Boolean)
+    .map((url, i) => ({ url, shape: shapes[i] === "ORIGINAL" ? "ORIGINAL" : ("SQUARE" as PhotoShape) }));
 }
 
-/** Upload any user-provided image (dish photo, want-to-try photo, pod
- * cover, avatar) to the shared bucket (docs/INFRA_SETUP.md §6) and return
- * its public URL, or an error message. Generic despite living in this
- * file — kept here since dish photos were its original and still most
- * common use. */
-export async function uploadImage(
-  supabase: SupabaseClient,
-  userId: string,
-  photo: File,
-): Promise<{ url: string } | { error: string }> {
-  const bucket = process.env.NEXT_PUBLIC_SUPABASE_DISH_PHOTOS_BUCKET!;
-  const ext = photo.name.split(".").pop() || "jpg";
-  const path = `${userId}/${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from(bucket).upload(path, photo);
-  if (error) return { error: `Photo upload failed: ${error.message}` };
-  return { url: supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl };
+/** Validates a client-submitted photo URL actually points to this user's
+ * own folder in our own bucket, before trusting it enough to save to the
+ * database. Necessary because uploads now happen directly from the
+ * browser to Supabase Storage (Vercel's serverless functions enforce a
+ * hard 4.5MB request body limit, so routing file bytes through a Server
+ * Action breaks for any real-sized photo in production) — the server
+ * action only ever sees the resulting URL, never the file itself, so it
+ * can no longer trust it by construction the way it could when it did
+ * the upload itself. */
+export function isOwnedImageUrl(url: string, userId: string): boolean {
+  const bucket = process.env.NEXT_PUBLIC_SUPABASE_DISH_PHOTOS_BUCKET;
+  const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${userId}/`;
+  return url.startsWith(base);
 }

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { resolveEaterIds } from "@/lib/eaters";
 import { resolveCoMakerIds } from "@/lib/co-makers";
-import { resolveCuisineId, resolveTagIds, uploadImage, collectNewPhotos } from "@/lib/dish-fields";
+import { resolveCuisineId, resolveTagIds, collectNewPhotos, isOwnedImageUrl } from "@/lib/dish-fields";
 import { removeRatingAndRescore } from "@/lib/ranking";
 
 export type CreateDishState = {
@@ -40,6 +40,13 @@ export async function createDish(
   if (!name) return { error: "Give the dish a name." };
   if (!regionId) return { error: "Pick a cuisine region." };
   if (newPhotos.length === 0) return { error: "Add a photo." };
+  // Photos are uploaded client-side before this ever submits (Vercel's
+  // 4.5MB serverless body limit rules out sending the raw file through a
+  // Server Action) — double-check every URL actually belongs to this
+  // user's own folder in our bucket before trusting it.
+  if (newPhotos.some((p) => !isOwnedImageUrl(p.url, authUser.id))) {
+    return { error: "One of those photos didn't upload correctly. Try again." };
+  }
 
   const myPodIds = (
     await prisma.podMember.findMany({ where: { userId: authUser.id, status: "active" }, select: { podId: true } })
@@ -56,19 +63,12 @@ export async function createDish(
   const cuisineId = await resolveCuisineId(regionId, cuisineName);
   const tagIds = await resolveTagIds(tagsRaw);
 
-  const uploadedPhotos: { url: string; shape: "SQUARE" | "ORIGINAL" }[] = [];
-  for (const { file, shape } of newPhotos) {
-    const uploaded = await uploadImage(supabase, authUser.id, file);
-    if ("error" in uploaded) return { error: uploaded.error };
-    uploadedPhotos.push({ url: uploaded.url, shape });
-  }
-
   const dish = await prisma.dish.create({
     data: {
       name,
       // First photo mirrors as the "cover" everywhere a single thumbnail
       // is shown; the full gallery lives on DishPhoto.
-      photoUrl: uploadedPhotos[0].url,
+      photoUrl: newPhotos[0].url,
       cuisineId,
       makerId: authUser.id,
       notes,
@@ -79,7 +79,7 @@ export async function createDish(
       coMakers: { create: coMakerIds.map((userId) => ({ userId })) },
       tags: { create: tagIds.map((tagId) => ({ tagId })) },
       photos: {
-        create: uploadedPhotos.map((p, i) => ({ url: p.url, displayShape: p.shape, position: i })),
+        create: newPhotos.map((p, i) => ({ url: p.url, displayShape: p.shape, position: i })),
       },
     },
   });
@@ -139,6 +139,9 @@ export async function updateDish(
 
   if (!name) return { error: "Give the dish a name." };
   if (!regionId) return { error: "Pick a cuisine region." };
+  if (newPhotos.some((p) => !isOwnedImageUrl(p.url, authUser.id))) {
+    return { error: "One of those photos didn't upload correctly. Try again." };
+  }
 
   const survivingExisting = existing.photos
     .filter((p) => !removePhotoIds.has(p.id))
@@ -156,14 +159,7 @@ export async function updateDish(
   const cuisineId = await resolveCuisineId(regionId, cuisineName);
   const tagIds = await resolveTagIds(tagsRaw);
 
-  const uploadedNewPhotos: { url: string; shape: "SQUARE" | "ORIGINAL" }[] = [];
-  for (const { file, shape } of newPhotos) {
-    const uploaded = await uploadImage(supabase, authUser.id, file);
-    if ("error" in uploaded) return { error: uploaded.error };
-    uploadedNewPhotos.push({ url: uploaded.url, shape });
-  }
-
-  const photoUrl = survivingExisting[0]?.url ?? uploadedNewPhotos[0].url;
+  const photoUrl = survivingExisting[0]?.url ?? newPhotos[0].url;
 
   await prisma.$transaction([
     prisma.dish.update({
@@ -186,7 +182,7 @@ export async function updateDish(
       const shape = shapeField === "ORIGINAL" ? "ORIGINAL" : "SQUARE";
       return prisma.dishPhoto.update({ where: { id: p.id }, data: { position: i, displayShape: shape } });
     }),
-    ...uploadedNewPhotos.map((p, i) =>
+    ...newPhotos.map((p, i) =>
       prisma.dishPhoto.create({
         data: { dishId, url: p.url, displayShape: p.shape, position: survivingExisting.length + i },
       }),

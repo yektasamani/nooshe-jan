@@ -11,7 +11,13 @@ export type ExistingDishPhoto = { id: string; url: string; displayShape: "SQUARE
  * create mode there are no existing photos and the first slot can't be
  * removed, so "at least one photo" holds structurally; in edit mode,
  * removing photos is allowed but the parent form gets told via
- * onValidityChange if that would leave zero. */
+ * onValidityChange if that would leave zero.
+ *
+ * Each new-photo slot uploads straight to Storage on selection (see
+ * PhotoInput/upload-client.ts) — the paired `newPhotoUrls`/
+ * `newPhotoShapes` hidden fields for a slot only render once that slot
+ * has actually finished uploading, so the two arrays stay aligned on
+ * submit even if some slots are still empty or mid-upload. */
 export function PhotoGalleryField({
   existingPhotos = [],
   onValidityChange,
@@ -23,16 +29,20 @@ export function PhotoGalleryField({
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [newSlots, setNewSlots] = useState<string[]>(isCreateMode ? ["0"] : []);
   const [nextSlotKey, setNextSlotKey] = useState(isCreateMode ? 1 : 0);
-  const [oversizedSlots, setOversizedSlots] = useState<Record<string, boolean>>({});
+  const [blockedSlots, setBlockedSlots] = useState<Record<string, boolean>>({});
+  const [uploadedUrls, setUploadedUrls] = useState<Record<string, string>>({});
 
   const survivingExistingCount = existingPhotos.filter((p) => !removedIds.has(p.id)).length;
-  const noPhotosLeft = survivingExistingCount === 0 && newSlots.length === 0;
-  const anyOversized = Object.values(oversizedSlots).some(Boolean);
+  // Counts only slots that actually finished uploading — an empty or
+  // still-uploading slot shouldn't count as "a photo," now that there's
+  // no native `required` fallback on the (upload-on-select) file input.
+  const noPhotosLeft = survivingExistingCount + Object.keys(uploadedUrls).length === 0;
+  const anyBlocked = Object.values(blockedSlots).some(Boolean);
 
   useEffect(() => {
-    onValidityChange?.(noPhotosLeft || anyOversized);
+    onValidityChange?.(noPhotosLeft || anyBlocked);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noPhotosLeft, anyOversized]);
+  }, [noPhotosLeft, anyBlocked]);
 
   function removeExisting(id: string) {
     setRemovedIds((prev) => new Set(prev).add(id));
@@ -45,9 +55,14 @@ export function PhotoGalleryField({
 
   function removeSlot(key: string) {
     setNewSlots((prev) => prev.filter((k) => k !== key));
-    setOversizedSlots((prev) => {
+    setBlockedSlots((prev) => {
       const next = { ...prev };
-      delete next[`new-${key}`];
+      delete next[key];
+      return next;
+    });
+    setUploadedUrls((prev) => {
+      const next = { ...prev };
+      delete next[key];
       return next;
     });
   }
@@ -93,21 +108,31 @@ export function PhotoGalleryField({
         <div key={key} className="flex items-start gap-2 rounded-lg border border-sage-200 bg-white p-2">
           <div className="flex-1">
             <PhotoInput
-              name="newPhotos"
-              onValidityChange={(tooLarge) =>
-                setOversizedSlots((prev) => ({ ...prev, [`new-${key}`]: tooLarge }))
+              onValidityChange={(blocked) => setBlockedSlots((prev) => ({ ...prev, [key]: blocked }))}
+              onUploaded={(url) =>
+                setUploadedUrls((prev) => {
+                  const next = { ...prev };
+                  if (url) next[key] = url;
+                  else delete next[key];
+                  return next;
+                })
               }
               className="text-sm text-ink file:mr-2 file:rounded-full file:border-0 file:bg-sage-50 file:px-2.5 file:py-1 file:text-xs file:text-sage-900"
             />
           </div>
-          <select
-            name="newPhotoShapes"
-            defaultValue="SQUARE"
-            className="rounded border border-sage-200 bg-white px-1.5 py-1.5 text-xs text-ink"
-          >
-            <option value="SQUARE">Square crop</option>
-            <option value="ORIGINAL">Original shape</option>
-          </select>
+          {uploadedUrls[key] && (
+            <>
+              <input type="hidden" name="newPhotoUrls" value={uploadedUrls[key]} />
+              <select
+                name="newPhotoShapes"
+                defaultValue="SQUARE"
+                className="rounded border border-sage-200 bg-white px-1.5 py-1.5 text-xs text-ink"
+              >
+                <option value="SQUARE">Square crop</option>
+                <option value="ORIGINAL">Original shape</option>
+              </select>
+            </>
+          )}
           {!(isCreateMode && i === 0) && (
             <button
               type="button"

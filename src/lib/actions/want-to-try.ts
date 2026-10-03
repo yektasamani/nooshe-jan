@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
-import { uploadImage } from "@/lib/dish-fields";
+import { isOwnedImageUrl } from "@/lib/dish-fields";
 
 /** Log an idea before it's ever been cooked (spec §1 Want-to-try) — no
  * ranking involved, nothing to rank until it's actually made. */
@@ -18,7 +18,7 @@ export async function createWantToTry(formData: FormData): Promise<void> {
   const name = String(formData.get("name") ?? "").trim();
   const link = String(formData.get("link") ?? "").trim() || null;
   const podId = String(formData.get("podId") ?? "").trim() || null;
-  const photo = formData.get("photo") as File | null;
+  const submittedPhotoUrl = String(formData.get("photo") ?? "").trim() || null;
 
   if (!name) redirect("/want-to-try/new");
 
@@ -31,11 +31,12 @@ export async function createWantToTry(formData: FormData): Promise<void> {
     if (!membership) redirect("/want-to-try/new");
   }
 
-  let photoUrl: string | null = null;
-  if (photo && photo.size > 0) {
-    const uploaded = await uploadImage(supabase, authUser.id, photo);
-    if (!("error" in uploaded)) photoUrl = uploaded.url;
-  }
+  // Uploaded client-side before this ever submits (Vercel's 4.5MB
+  // serverless body limit rules out sending the raw file through a
+  // Server Action) — double-check it actually belongs to this user
+  // before trusting it.
+  const photoUrl =
+    submittedPhotoUrl && isOwnedImageUrl(submittedPhotoUrl, authUser.id) ? submittedPhotoUrl : null;
 
   await prisma.wantToTry.create({
     data: { name, link, photoUrl, podId, addedById: authUser.id },
@@ -61,7 +62,7 @@ export async function updateWantToTry(formData: FormData): Promise<void> {
   const name = String(formData.get("name") ?? "").trim();
   const link = String(formData.get("link") ?? "").trim() || null;
   const podId = String(formData.get("podId") ?? "").trim() || null;
-  const photo = formData.get("photo") as File | null;
+  const submittedPhotoUrl = String(formData.get("photo") ?? "").trim() || null;
 
   if (!name) redirect(`/want-to-try/${id}/edit`);
 
@@ -72,11 +73,10 @@ export async function updateWantToTry(formData: FormData): Promise<void> {
     if (!membership) redirect(`/want-to-try/${id}/edit`);
   }
 
-  let photoUrl = existing.photoUrl;
-  if (photo && photo.size > 0) {
-    const uploaded = await uploadImage(supabase, authUser.id, photo);
-    if (!("error" in uploaded)) photoUrl = uploaded.url;
-  }
+  const photoUrl =
+    submittedPhotoUrl && isOwnedImageUrl(submittedPhotoUrl, authUser.id)
+      ? submittedPhotoUrl
+      : existing.photoUrl;
 
   await prisma.wantToTry.update({
     where: { id },

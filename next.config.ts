@@ -11,19 +11,17 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    // Default 1mb body limit on Server Actions is too small for a phone
-    // photo upload (dish/want-to-try/avatar photos all go through one),
-    // and a dish can carry several photos in one submission — so this
-    // needs to cover multiple photos at once, not just a single one.
-    // proxyClientMaxBodySize gates the request before it even reaches the
-    // action (this app has middleware, for Supabase auth) — both need to
-    // move together or the lower one silently truncates the upload,
-    // surfacing as a raw "Unexpected end of form" parse error instead of
-    // a clean size-limit message.
+    // Photos no longer travel through Server Actions at all (uploaded
+    // client-side straight to Supabase Storage — see
+    // src/lib/upload-client.ts — since Vercel enforces a hard,
+    // non-configurable 4.5MB request body limit on serverless functions
+    // in production, which no setting here can raise). Forms now only
+    // carry text fields and already-uploaded URLs, so this just needs
+    // modest headroom above the 1mb default, not photo-sized limits.
     serverActions: {
-      bodySizeLimit: "50mb",
+      bodySizeLimit: "2mb",
     },
-    proxyClientMaxBodySize: "50mb",
+    proxyClientMaxBodySize: "2mb",
   },
 };
 

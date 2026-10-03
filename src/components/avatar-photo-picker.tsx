@@ -3,36 +3,42 @@
 import { useState, type ChangeEvent } from "react";
 import { Avatar, AVATAR_SIZE_CLASSES } from "@/components/avatar";
 import { MAX_PHOTO_BYTES, MAX_PHOTO_LABEL } from "@/lib/photo-limits";
+import { uploadImageFromBrowser } from "@/lib/upload-client";
 
 /** Click-the-photo-to-edit pattern for an avatar-shaped image (pod cover,
  * user avatar) — replaces a bare "Choose File" input, which read as
  * confusing/unstyled next to a circular photo. Hover reveals an "Edit"
- * overlay; picking a file swaps in a local preview immediately. The
- * parent still owns the actual <form>/submit button (via onFileChange,
- * so it can show its own Save control only once a file's picked) since
- * this can live inside a bigger form (Settings) or its own small one
- * (pod cover). */
+ * overlay; picking a file shows a local preview immediately and uploads
+ * straight to Storage in the background (Vercel's 4.5MB serverless body
+ * limit means the file can't ride through the form/Server Action
+ * anymore — see upload-client.ts). The parent still owns the actual
+ * <form>/submit button (via onPickedChange, so it can show its own Save
+ * control only once something's picked) since this can live inside a
+ * bigger form (Settings) or its own small one (pod cover). */
 export function AvatarPhotoPicker({
   name,
   currentName,
   currentPhotoUrl,
   size = "lg",
-  onFileChange,
+  onPickedChange,
   onValidityChange,
 }: {
   name: string;
   currentName: string;
   currentPhotoUrl: string | null;
   size?: "sm" | "md" | "lg";
-  onFileChange?: (file: File | null) => void;
-  onValidityChange?: (tooLarge: boolean) => void;
+  onPickedChange?: (picked: boolean) => void;
+  onValidityChange?: (blocked: boolean) => void;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  function handleChange(e: ChangeEvent<HTMLInputElement>) {
+  async function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
-    onFileChange?.(file);
+    setUploadedUrl(null);
+    onPickedChange?.(Boolean(file));
 
     if (!file) {
       setPreview(null);
@@ -42,16 +48,26 @@ export function AvatarPhotoPicker({
     }
 
     setPreview(URL.createObjectURL(file));
+
     if (file.size > MAX_PHOTO_BYTES) {
-      const message = `That photo is too big (over ${MAX_PHOTO_LABEL}). Pick a smaller one.`;
-      setError(message);
-      e.target.setCustomValidity(message);
+      setError(`That photo is too big (over ${MAX_PHOTO_LABEL}). Pick a smaller one.`);
       onValidityChange?.(true);
-    } else {
-      setError(null);
-      e.target.setCustomValidity("");
-      onValidityChange?.(false);
+      return;
     }
+
+    setError(null);
+    setUploading(true);
+    onValidityChange?.(true);
+    const result = await uploadImageFromBrowser(file);
+    setUploading(false);
+
+    if ("error" in result) {
+      setError(result.error);
+      onValidityChange?.(true);
+      return;
+    }
+    setUploadedUrl(result.url);
+    onValidityChange?.(false);
   }
 
   return (
@@ -70,12 +86,14 @@ export function AvatarPhotoPicker({
         </span>
         <input
           type="file"
-          name={name}
           accept="image/*"
           onChange={handleChange}
+          disabled={uploading}
           className="sr-only"
         />
       </label>
+      {uploadedUrl && <input type="hidden" name={name} value={uploadedUrl} />}
+      {uploading && <p className="text-xs text-ink/50">Uploading…</p>}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );

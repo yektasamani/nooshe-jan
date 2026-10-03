@@ -17,7 +17,7 @@ export function SettingsForm({
   privateByDefault: boolean;
 }) {
   const [state, formAction] = useActionState(updateSettings, initialState);
-  const [photoTooLarge, setPhotoTooLarge] = useState(false);
+  const [photoBlocked, setPhotoBlocked] = useState(false);
 
   return (
     <form action={formAction} className="mt-6 flex flex-col gap-5">
@@ -28,7 +28,7 @@ export function SettingsForm({
           currentName={currentName}
           currentPhotoUrl={avatarUrl}
           size="lg"
-          onValidityChange={setPhotoTooLarge}
+          onValidityChange={setPhotoBlocked}
         />
       </label>
 
@@ -62,7 +62,7 @@ export function SettingsForm({
 
       <SubmitButton
         pendingText="Saving…"
-        disabled={photoTooLarge}
+        disabled={photoBlocked}
         className="w-fit rounded-full bg-sage-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-sage-900 disabled:opacity-60"
       >
         Save changes
