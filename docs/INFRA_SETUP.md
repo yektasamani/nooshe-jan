@@ -86,6 +86,14 @@ enable. Two things worth setting before you build the sign-up flow:
 2. **Authentication → Providers → Email**: for local dev, you may want to
    turn off "Confirm email" so test signups don't need a real inbox.
    Turn it back on before you invite real people.
+3. **Password reset** ("Forgot password?" on /login) emails a link back to
+   `/reset-password`. Supabase only honours that if it matches an entry in
+   `Redirect URLs`, so add a wildcard per origin: `http://localhost:3000/**`
+   and `https://<your-domain>/**`. Otherwise the link silently falls back
+   to `Site URL` and the reset won't work. It uses the implicit flow, so the
+   default email template works as-is and the link opens on any device.
+   Note: Supabase's built-in mailer only delivers to project team members,
+   so real users need custom SMTP (e.g. Resend) to receive it.
 
 **Important — our own `users` table vs. Supabase's `auth.users`:**
 Supabase manages its own `auth.users` table (email, password hash, etc.)
@@ -200,7 +208,8 @@ required for the report to be captured.
    Run `npm run db:migrate:deploy` yourself (locally, pointed at prod) after
    each migration that needs to ship, or wire it into a deploy step later.
 5. Once you have a real domain, add it to Supabase's **Auth → URL
-   Configuration → Redirect URLs**, and update `Site URL`.
+   Configuration → Redirect URLs** as `https://<your-domain>/**` (the
+   wildcard is needed for password reset, §5), and update `Site URL`.
 
 ## 10. Local dev loop, day to day
 
